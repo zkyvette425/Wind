@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <AssemblyName>Wind.Server</AssemblyName>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Wind.Core\Wind.Core.csproj" />
+    <ProjectReference Include="..\Wind.Shared\Wind.Shared.csproj" />
+    <ProjectReference Include="..\Wind.Application\Wind.Application.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -13,9 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Wind.Core\Wind.Core.csproj" />
     <ProjectReference Include="..\Wind.Shared\Wind.Shared.csproj" />
-    <ProjectReference Include="..\Wind.Application\Wind.Application.csproj" />
   </ItemGroup>
 
 </Project>

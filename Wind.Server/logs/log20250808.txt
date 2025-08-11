@@ -137,3 +137,17 @@
 2025-08-08 06:59:24.888 +08:00 [DBG] Connection id "0HNEM0NU65PS8" sending FIN because: "The Socket transport's send loop completed gracefully."
 2025-08-08 06:59:24.889 +08:00 [DBG] Connection id "0HNEM0NU65PS9" sending FIN because: "The Socket transport's send loop completed gracefully."
 2025-08-08 06:59:24.895 +08:00 [DBG] Hosting stopped
+2025-08-08 20:31:13.353 +08:00 [DBG] Registered model binder providers, in the following order: ["Microsoft.AspNetCore.Mvc.ModelBinding.Binders.BinderTypeModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.ServicesModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.BodyModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.HeaderModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.FloatingPointTypeModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.EnumTypeModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.DateTimeModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.SimpleTypeModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.TryParseModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.CancellationTokenModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.ByteArrayModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.FormFileModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.FormCollectionModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.KeyValuePairModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.DictionaryModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.ArrayModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.CollectionModelBinderProvider","Microsoft.AspNetCore.Mvc.ModelBinding.Binders.ComplexObjectModelBinderProvider"]
+2025-08-08 20:31:13.412 +08:00 [DBG] Registered SignalR Protocol: json, implemented by Microsoft.AspNetCore.SignalR.Protocol.JsonHubProtocol.
+2025-08-08 20:31:13.441 +08:00 [DBG] Hosting starting
+2025-08-08 20:31:13.463 +08:00 [DBG] Middleware configuration started with options: {AllowedHosts = *, AllowEmptyHosts = True, IncludeFailureMessage = True}
+2025-08-08 20:31:13.467 +08:00 [DBG] Wildcard detected, all requests with hosts will be allowed.
+2025-08-08 20:31:13.480 +08:00 [INF] Now listening on: http://localhost:5271
+2025-08-08 20:31:13.481 +08:00 [DBG] Loaded hosting startup assembly Wind.Server
+2025-08-08 20:31:13.481 +08:00 [INF] Application started. Press Ctrl+C to shut down.
+2025-08-08 20:31:13.483 +08:00 [INF] Hosting environment: Development
+2025-08-08 20:31:13.484 +08:00 [INF] Content root path: C:\work\Wind\Wind.Server
+2025-08-08 20:31:13.486 +08:00 [DBG] Hosting started
+2025-08-08 20:39:03.796 +08:00 [INF] Application is shutting down...
+2025-08-08 20:39:03.797 +08:00 [DBG] Hosting stopping
+2025-08-08 20:39:03.805 +08:00 [DBG] Hosting stopped

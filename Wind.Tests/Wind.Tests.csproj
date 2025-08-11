@@ -20,8 +20,6 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Wind.Core\Wind.Core.csproj" />
-  </ItemGroup>
+  <!-- TODO: Orleans测试项目引用将在v1.0阶段添加 -->
 
 </Project>

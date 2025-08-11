@@ -4,6 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 🚨 重要提醒 - 项目纲领系统
 
+### 命令行要求
+- 使用中文沟通
+- 使用Windows命令行语法
+
 ### 📍 纲领位置和获取方式
 - **完整纲领文档**: `plans/纲领.md` - 包含所有技术决策、架构原则和开发规范
 - **工作模式指导**: 本文件仅为快速引导，详细指导在纲领文档中

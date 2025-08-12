@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.TestingHost;
 using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 
 namespace Wind.Tests.TestFixtures;
 
@@ -22,6 +24,12 @@ public class ClusterFixture : IDisposable
         
         // 配置Orleans Client
         builder.AddClientBuilderConfigurator<TestClientConfigurator>();
+        
+        // 全局配置MessagePack序列化器
+        builder.ConfigureHostConfiguration(config =>
+        {
+            // 确保测试集群正确配置
+        });
 
         Cluster = builder.Build();
         Cluster.Deploy();
@@ -48,9 +56,13 @@ public class TestSiloConfigurator : ISiloConfigurator
                 logging.SetMinimumLevel(LogLevel.Warning); // 减少测试日志噪音
             })
             .AddMemoryGrainStorageAsDefault() // 使用内存存储用于测试
-            .ConfigureServices(services =>
+            .ConfigureServices(services => 
             {
-                // 添加测试需要的服务
+                // 为测试环境配置MessagePack序列化器
+                services.AddSerializer(serializerBuilder => 
+                {
+                    serializerBuilder.AddMessagePackSerializer();
+                });
             });
     }
 }
@@ -62,7 +74,13 @@ public class TestClientConfigurator : IClientBuilderConfigurator
 {
     public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
     {
-        // Orleans客户端的日志配置通过其他方式设置
-        // clientBuilder本身不直接支持ConfigureLogging
+        clientBuilder.ConfigureServices(services => 
+        {
+            // 为客户端配置MessagePack序列化器
+            services.AddSerializer(serializerBuilder => 
+            {
+                serializerBuilder.AddMessagePackSerializer();
+            });
+        });
     }
 }

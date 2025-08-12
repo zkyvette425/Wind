@@ -7,4 +7,8 @@
     <UseSerialization>true</UseSerialization>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Serialization.Abstractions" Version="9.2.1" />
+  </ItemGroup>
+
 </Project>

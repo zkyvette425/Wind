@@ -2,9 +2,11 @@ using System.Net;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
+using Orleans.Serialization;
 using Serilog;
 using MagicOnion;
 using MagicOnion.Server;
+using MessagePack;
 
 // 从配置文件读取Serilog配置
 var configuration = new ConfigurationBuilder()
@@ -41,7 +43,9 @@ try
             .ConfigureEndpoints(
                 advertisedIP: IPAddress.Loopback,
                 siloPort: 11111, 
-                gatewayPort: 30000);
+                gatewayPort: 30000)
+            // 配置内存持久化存储 (临时方案，后续升级到Redis)
+            .AddMemoryGrainStorage("PlayerStorage");
     });
 
     // 使用Serilog，确保捕获所有Information级别日志
@@ -51,6 +55,9 @@ try
 
     // 添加MagicOnion服务 (基于Context7文档)
     builder.Services.AddMagicOnion();
+    
+    // 配置Orleans MessagePack序列化器 (正确位置)
+    builder.Services.AddSerializer(serializerBuilder => serializerBuilder.AddMessagePackSerializer());
 
     // 添加健康检查
     builder.Services.AddHealthChecks()

@@ -9,12 +9,23 @@
     <IsMagicOnionServer>true</IsMagicOnionServer>
     <IsWebProject>true</IsWebProject>
     <UseLogging>true</UseLogging>
+    <UseDataStorage>true</UseDataStorage>
+    <UseRedis>true</UseRedis>
+    <UseSerialization>true</UseSerialization>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Wind.Shared\Wind.Shared.csproj" />
     <ProjectReference Include="..\Wind.Grains\Wind.Grains.csproj" />
     <ProjectReference Include="..\Wind.GrainInterfaces\Wind.GrainInterfaces.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Redis持久化存储 - 先使用内存存储作为临时方案 -->
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Serialization.MessagePack" Version="9.2.1" />
   </ItemGroup>
 
 </Project>

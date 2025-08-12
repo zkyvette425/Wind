@@ -17,4 +17,8 @@
     <ProjectReference Include="..\Wind.Shared\Wind.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Serialization.MessagePack" Version="9.2.1" />
+  </ItemGroup>
+
 </Project>

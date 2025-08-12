@@ -7,4 +7,8 @@
     <UseSerialization>true</UseSerialization>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Wind.Shared\Wind.Shared.csproj" />
+  </ItemGroup>
+
 </Project>

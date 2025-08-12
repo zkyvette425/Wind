@@ -45,7 +45,9 @@ try
                 siloPort: 11111, 
                 gatewayPort: 30000)
             // 配置内存持久化存储 (临时方案，后续升级到Redis)
-            .AddMemoryGrainStorage("PlayerStorage");
+            .AddMemoryGrainStorage("PlayerStorage")
+            .AddMemoryGrainStorage("RoomStorage")
+            .AddMemoryGrainStorage("MatchmakingStorage");
     });
 
     // 使用Serilog，确保捕获所有Information级别日志
@@ -64,6 +66,7 @@ try
         .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy());
 
     Log.Information("Orleans Silo配置完成，端口: Silo=11111, Gateway=30000");
+    Log.Information("Orleans存储配置: PlayerStorage, RoomStorage, MatchmakingStorage (Memory)");
     Log.Information("MagicOnion服务已添加到DI容器");
     Log.Information("健康检查服务已配置");
 

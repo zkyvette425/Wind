@@ -80,6 +80,9 @@ namespace Wind.Shared.Protocols
 
         [MPKey(7)]
         public PlayerPosition Position { get; set; } = new();
+
+        [MPKey(8)]
+        public string? CurrentRoomId { get; set; }
     }
 
     /// <summary>
@@ -89,19 +92,49 @@ namespace Wind.Shared.Protocols
     public class PlayerUpdateRequest
     {
         [MPKey(0)]
-        public string? DisplayName { get; set; }
+        [Required]
+        public string PlayerId { get; set; } = string.Empty;
 
         [MPKey(1)]
-        public PlayerPosition? Position { get; set; }
+        public string? DisplayName { get; set; }
 
         [MPKey(2)]
-        public PlayerOnlineStatus? OnlineStatus { get; set; }
+        public PlayerPosition? Position { get; set; }
 
         [MPKey(3)]
-        public PlayerSettings? Settings { get; set; }
+        public PlayerOnlineStatus? OnlineStatus { get; set; }
 
         [MPKey(4)]
+        public PlayerSettings? Settings { get; set; }
+
+        [MPKey(5)]
+        public string? CurrentRoomId { get; set; }
+
+        [MPKey(6)]
         public int Version { get; set; } // 用于乐观锁
+    }
+
+    /// <summary>
+    /// 玩家位置更新请求（别名，向后兼容）
+    /// </summary>
+    [MessagePackObject]
+    public class UpdatePlayerRequest : PlayerUpdateRequest
+    {
+    }
+
+    /// <summary>
+    /// 玩家位置更新请求
+    /// </summary>
+    [MessagePackObject]
+    public class UpdatePlayerPositionRequest
+    {
+        [MPKey(0)]
+        [Required]
+        public string PlayerId { get; set; } = string.Empty;
+
+        [MPKey(1)]
+        [Required]
+        public PlayerPosition Position { get; set; } = new();
     }
 
     /// <summary>
@@ -130,6 +163,10 @@ namespace Wind.Shared.Protocols
     public class PlayerLogoutRequest
     {
         [MPKey(0)]
+        [Required]
+        public string PlayerId { get; set; } = string.Empty;
+
+        [MPKey(1)]
         public string? Reason { get; set; }
     }
 

@@ -9,7 +9,7 @@ class Program
 {
     static async Task<int> Main(string[] args)
     {
-        Console.WriteLine("Wind游戏客户端 v1.2 - MagicOnion + Orleans集成测试");
+        Console.WriteLine("Wind游戏客户端 v1.3 - 完整Orleans客户端集成测试");
         Console.WriteLine("================================================");
 
         // 配置日志和依赖注入
@@ -57,7 +57,7 @@ class Program
             Console.WriteLine("测试完成！按任意键退出...");
             Console.ReadKey();
 
-            client.Disconnect();
+            await client.DisconnectAsync();
             return 0;
         }
         catch (Exception ex)
@@ -96,6 +96,13 @@ class Program
             Console.WriteLine("测试4: Orleans Grain直接调用 - HelloGrain");
             var grainResult = await client.TestOrleansGrainAsync("Client Direct Call");
             Console.WriteLine($"   结果: {grainResult}");
+            Console.WriteLine();
+
+            // 测试5: 混合调用模式
+            Console.WriteLine("测试5: 混合调用模式 - Orleans + MagicOnion并行");
+            var hybridResult = await client.TestHybridCallAsync("Hybrid Test", 50, 75);
+            Console.WriteLine($"   Orleans结果: {hybridResult.OrleansResult}");
+            Console.WriteLine($"   MagicOnion结果: {hybridResult.MagicOnionResult}");
             Console.WriteLine();
 
             Console.WriteLine("✅ 所有测试执行完成！");

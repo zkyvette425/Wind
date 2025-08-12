@@ -1,13 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <!-- 项目类型标识 -->
+    <IsMagicOnionProject>true</IsMagicOnionProject>
+    <IsMagicOnionShared>true</IsMagicOnionShared>
+    <UseSerialization>true</UseSerialization>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="MagicOnion.Abstractions" Version="7.0.6" />
-  </ItemGroup>
 
 </Project>

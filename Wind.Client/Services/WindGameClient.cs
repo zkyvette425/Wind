@@ -5,6 +5,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Configuration;
+using Orleans.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Wind.GrainInterfaces;
 
 namespace Wind.Client.Services;
@@ -17,8 +20,8 @@ public class WindGameClient : IDisposable
 {
     private readonly ILogger<WindGameClient> _logger;
     private GrpcChannel? _grpcChannel;
-    // Orleans客户端暂时注释掉，专注MagicOnion测试
-    // private IClusterClient? _orleansSaidClient;
+    private IClusterClient? _orleansClient;
+    private IHost? _orleansHost;
     private ITestService? _testService;
     private bool _disposed = false;
 
@@ -42,27 +45,116 @@ public class WindGameClient : IDisposable
     /// </summary>
     public async Task<bool> ConnectAsync(ServerConfig config)
     {
+        return await ConnectWithRetryAsync(config, maxRetries: 3, delayBetweenRetries: TimeSpan.FromSeconds(2));
+    }
+
+    /// <summary>
+    /// 带重试机制的连接方法
+    /// </summary>
+    private async Task<bool> ConnectWithRetryAsync(ServerConfig config, int maxRetries, TimeSpan delayBetweenRetries)
+    {
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                _logger.LogInformation("正在连接到Wind游戏服务器... (尝试 {Attempt}/{MaxRetries})", attempt, maxRetries);
+
+                // 1. 建立gRPC连接用于MagicOnion RPC调用
+                _grpcChannel = GrpcChannel.ForAddress(config.GrpcAddress);
+                _testService = MagicOnionClient.Create<ITestService>(_grpcChannel);
+                
+                // 测试gRPC连接
+                await TestConnectionAsync();
+                _logger.LogInformation("MagicOnion gRPC连接已建立: {Address}", config.GrpcAddress);
+
+                // 2. 建立Orleans客户端连接用于直接Grain调用  
+                var hostBuilder = Host.CreateDefaultBuilder()
+                    .UseOrleansClient(clientBuilder =>
+                    {
+                        clientBuilder.UseLocalhostClustering(gatewayPort: config.OrleansGatewayPort);
+                    })
+                    .ConfigureLogging(logging =>
+                    {
+                        logging.ClearProviders();
+                        logging.AddConsole();
+                        logging.SetMinimumLevel(LogLevel.Warning);
+                    });
+                
+                _orleansHost = hostBuilder.Build();
+                await _orleansHost.StartAsync();
+                _orleansClient = _orleansHost.Services.GetRequiredService<IClusterClient>();
+                
+                _logger.LogInformation("Orleans客户端连接已建立: {GatewayAddress}:{GatewayPort}", 
+                    config.OrleansGatewayAddress, config.OrleansGatewayPort);
+
+                _logger.LogInformation("Wind游戏客户端连接成功！");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "连接尝试 {Attempt}/{MaxRetries} 失败", attempt, maxRetries);
+                
+                // 清理已建立的连接
+                await CleanupPartialConnectionsAsync();
+
+                if (attempt == maxRetries)
+                {
+                    _logger.LogError("所有连接尝试失败，放弃连接");
+                    return false;
+                }
+                
+                _logger.LogInformation("等待 {Delay} 后重试...", delayBetweenRetries);
+                await Task.Delay(delayBetweenRetries);
+            }
+        }
+        
+        return false;
+    }
+
+    /// <summary>
+    /// 测试连接是否正常
+    /// </summary>
+    private async Task TestConnectionAsync()
+    {
+        if (_testService == null)
+            throw new InvalidOperationException("gRPC服务未初始化");
+
+        // 发送一个简单的测试请求验证连接
+        await _testService.GetServerInfoAsync();
+    }
+
+    /// <summary>
+    /// 清理部分建立的连接
+    /// </summary>
+    private async Task CleanupPartialConnectionsAsync()
+    {
         try
         {
-            _logger.LogInformation("正在连接到Wind游戏服务器...");
-
-            // 1. 建立gRPC连接用于MagicOnion RPC调用
-            _grpcChannel = GrpcChannel.ForAddress(config.GrpcAddress);
-            _testService = MagicOnionClient.Create<ITestService>(_grpcChannel);
-            
-            _logger.LogInformation("MagicOnion gRPC连接已建立: {Address}", config.GrpcAddress);
-
-            // 2. Orleans客户端连接暂时跳过，专注MagicOnion测试
-            // 在v1.2阶段先验证MagicOnion功能，Orleans直接调用在后续版本完善
-            _logger.LogInformation("MagicOnion集成测试模式 - 跳过Orleans直接客户端连接");
-
-            _logger.LogInformation("Wind游戏客户端连接成功！");
-            return true;
+            if (_orleansHost != null)
+            {
+                await _orleansHost.StopAsync();
+                _orleansHost.Dispose();
+                _orleansHost = null;
+                _orleansClient = null;
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "连接到Wind游戏服务器失败");
-            return false;
+            _logger.LogDebug(ex, "清理Orleans客户端连接时发生错误");
+        }
+
+        try
+        {
+            if (_grpcChannel != null)
+            {
+                _grpcChannel.Dispose();
+                _grpcChannel = null;
+                _testService = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "清理gRPC连接时发生错误");
         }
     }
 
@@ -109,30 +201,69 @@ public class WindGameClient : IDisposable
     }
 
     /// <summary>
-    /// 测试Orleans Grain直接调用 (v1.2暂时跳过，通过MagicOnion间接调用)
+    /// 测试Orleans Grain直接调用
     /// </summary>
     public async Task<string> TestOrleansGrainAsync(string name)
     {
-        // v1.2阶段暂时通过MagicOnion RPC间接调用Orleans Grain
-        // 这样可以测试MagicOnion服务内部调用Grain的功能
-        _logger.LogInformation("通过MagicOnion RPC间接调用Orleans Grain (AddAsync会调用HelloGrain)");
+        if (_orleansClient == null)
+            throw new InvalidOperationException("Orleans客户端未连接到服务器");
+
+        _logger.LogInformation("直接调用Orleans Grain: HelloGrain({Name})", name);
         
-        // 调用AddAsync，它内部会调用Orleans HelloGrain
-        var result = await TestAddAsync(1, 1);
-        return $"通过MagicOnion间接调用Orleans Grain成功，计算结果: {result}";
+        try
+        {
+            // 直接调用Orleans Grain
+            var helloGrain = _orleansClient.GetGrain<IHelloGrain>(name);
+            var greeting = await helloGrain.SayHelloAsync(name);
+            
+            _logger.LogInformation("Orleans Grain调用结果: {Greeting}", greeting);
+            return greeting;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Orleans Grain调用失败");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 测试Orleans和MagicOnion混合调用
+    /// </summary>
+    public async Task<(string OrleansResult, int MagicOnionResult)> TestHybridCallAsync(string name, int x, int y)
+    {
+        _logger.LogInformation("测试混合调用模式: Orleans + MagicOnion");
+        
+        // 并行调用Orleans Grain和MagicOnion RPC
+        var orleansTask = TestOrleansGrainAsync(name);
+        var magicOnionTask = TestAddAsync(x, y);
+        
+        await Task.WhenAll(orleansTask, magicOnionTask);
+        
+        var results = (orleansTask.Result, magicOnionTask.Result);
+        _logger.LogInformation("混合调用完成: Orleans=\"{OrleansResult}\", MagicOnion={MagicOnionResult}", 
+            results.Item1, results.Item2);
+            
+        return results;
     }
 
     /// <summary>
     /// 断开连接并释放资源
     /// </summary>
-    public void Disconnect()
+    public async Task DisconnectAsync()
     {
         try
         {
             _logger.LogInformation("正在断开Wind游戏客户端连接...");
 
-            // Orleans客户端在v1.2阶段暂时跳过
-            // if (_orleansSaidClient != null) { ... }
+            // 断开Orleans客户端连接
+            if (_orleansHost != null)
+            {
+                await _orleansHost.StopAsync();
+                _orleansHost.Dispose();
+                _orleansHost = null;
+                _orleansClient = null;
+                _logger.LogInformation("Orleans客户端连接已断开");
+            }
 
             if (_grpcChannel != null)
             {
@@ -153,7 +284,7 @@ public class WindGameClient : IDisposable
     {
         if (!_disposed)
         {
-            Disconnect();
+            DisconnectAsync().GetAwaiter().GetResult();
             _disposed = true;
         }
     }

@@ -2,18 +2,14 @@
 
   <PropertyGroup>
     <AssemblyName>Wind.Server</AssemblyName>
-    <TargetFramework>net9.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- 项目类型标识 -->
+    <IsOrleansProject>true</IsOrleansProject>
+    <IsOrleansServer>true</IsOrleansServer>
+    <IsMagicOnionProject>true</IsMagicOnionProject>
+    <IsMagicOnionServer>true</IsMagicOnionServer>
+    <IsWebProject>true</IsWebProject>
+    <UseLogging>true</UseLogging>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="MagicOnion.Server" Version="7.0.6" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.8" />
-    <PackageReference Include="Microsoft.Orleans.Server" Version="9.2.1" />
-    <PackageReference Include="Serilog.AspNetCore" Version="8.0.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
-  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Wind.Shared\Wind.Shared.csproj" />

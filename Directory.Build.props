@@ -1,0 +1,148 @@
+<Project>
+  
+  <!-- 全局属性配置 -->
+  <PropertyGroup>
+    <!-- .NET版本统一 -->
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>12.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    
+    <!-- 编译配置 -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningLevel>5</WarningLevel>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    
+    <!-- 项目元信息 -->
+    <Company>Wind Game Studio</Company>
+    <Product>Wind游戏服务器框架</Product>
+    <Copyright>Copyright © 2025 Wind Game Studio</Copyright>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    
+    <!-- 调试配置 -->
+    <DebugType>embedded</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <!-- 核心技术栈版本锁定 -->
+  <PropertyGroup Label="Core Framework Versions">
+    <!-- Orleans 版本 -->
+    <OrleansVersion>9.2.1</OrleansVersion>
+    
+    <!-- MagicOnion 版本 -->
+    <MagicOnionVersion>7.0.6</MagicOnionVersion>
+    
+    <!-- Microsoft Extensions 版本 -->
+    <MicrosoftExtensionsVersion>9.0.8</MicrosoftExtensionsVersion>
+    
+    <!-- Serilog 版本 -->
+    <SerilogVersion>8.0.0</SerilogVersion>
+    <SerilogExtensionsVersion>8.0.0</SerilogExtensionsVersion>
+    
+    <!-- MessagePack 版本 -->
+    <MessagePackVersion>3.1.1</MessagePackVersion>
+    
+    <!-- 测试框架版本 -->
+    <XunitVersion>2.9.2</XunitVersion>
+    <XunitRunnerVersion>2.8.2</XunitRunnerVersion>
+    <MoqVersion>4.20.70</MoqVersion>
+    <MicrosoftTestSdkVersion>17.12.0</MicrosoftTestSdkVersion>
+    <CoverletCollectorVersion>6.0.2</CoverletCollectorVersion>
+    
+    <!-- 数据库和缓存版本 -->
+    <RedisVersion>2.8.16</RedisVersion>
+    <MongoDriverVersion>2.32.0</MongoDriverVersion>
+    <EfCoreVersion>9.0.8</EfCoreVersion>
+    
+    <!-- ASP.NET Core 版本 -->
+    <SwashbuckleVersion>6.5.0</SwashbuckleVersion>
+  </PropertyGroup>
+
+  <!-- Orleans 包组 -->
+  <ItemGroup Label="Orleans Packages" Condition="'$(IsOrleansProject)' == 'true'">
+    <!-- Orleans服务端包 (Wind.Server项目使用) -->
+    <PackageReference Include="Microsoft.Orleans.Server" Version="$(OrleansVersion)" Condition="'$(IsOrleansServer)' == 'true'" />
+    
+    <!-- Orleans客户端包 (Wind.Client项目使用) -->
+    <PackageReference Include="Microsoft.Orleans.Client" Version="$(OrleansVersion)" Condition="'$(IsOrleansClient)' == 'true'" />
+    
+    <!-- Orleans核心抽象包 (Wind.Grains, Wind.GrainInterfaces使用) -->
+    <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="$(OrleansVersion)" Condition="'$(IsOrleansGrain)' == 'true'" />
+    
+    <!-- Orleans序列化包 -->
+    <PackageReference Include="Microsoft.Orleans.Serialization.Abstractions" Version="$(OrleansVersion)" />
+  </ItemGroup>
+
+  <!-- MagicOnion 包组 -->
+  <ItemGroup Label="MagicOnion Packages" Condition="'$(IsMagicOnionProject)' == 'true'">
+    <!-- MagicOnion服务端包 (Wind.Server, Wind.Grains使用) -->
+    <PackageReference Include="MagicOnion.Server" Version="$(MagicOnionVersion)" Condition="'$(IsMagicOnionServer)' == 'true'" />
+    
+    <!-- MagicOnion客户端包 (Wind.Client使用) -->
+    <PackageReference Include="MagicOnion.Client" Version="$(MagicOnionVersion)" Condition="'$(IsMagicOnionClient)' == 'true'" />
+    
+    <!-- MagicOnion抽象包 (Wind.Shared使用) -->
+    <PackageReference Include="MagicOnion.Abstractions" Version="$(MagicOnionVersion)" Condition="'$(IsMagicOnionShared)' == 'true'" />
+  </ItemGroup>
+
+  <!-- 日志记录包组 -->
+  <ItemGroup Label="Logging Packages" Condition="'$(UseLogging)' == 'true'">
+    <PackageReference Include="Serilog.AspNetCore" Version="$(SerilogVersion)" Condition="'$(IsWebProject)' == 'true'" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="$(SerilogExtensionsVersion)" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.Seq" Version="8.0.0" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="8.0.4" />
+    <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
+    <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
+  </ItemGroup>
+
+  <!-- 序列化包组 -->
+  <ItemGroup Label="Serialization Packages" Condition="'$(UseSerialization)' == 'true'">
+    <PackageReference Include="MessagePack" Version="$(MessagePackVersion)" />
+    <PackageReference Include="MessagePack.Annotations" Version="$(MessagePackVersion)" />
+  </ItemGroup>
+
+  <!-- 测试框架包组 -->
+  <ItemGroup Label="Testing Packages" Condition="'$(IsTestProject)' == 'true'">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(MicrosoftTestSdkVersion)" />
+    <PackageReference Include="xunit" Version="$(XunitVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitRunnerVersion)" />
+    <PackageReference Include="coverlet.collector" Version="$(CoverletCollectorVersion)" />
+    <PackageReference Include="Moq" Version="$(MoqVersion)" />
+    
+    <!-- Orleans测试包 -->
+    <PackageReference Include="Microsoft.Orleans.TestingHost" Version="$(OrleansVersion)" />
+  </ItemGroup>
+
+  <!-- ASP.NET Core 包组 -->
+  <ItemGroup Label="AspNetCore Packages" Condition="'$(IsWebProject)' == 'true'">
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="$(SwashbuckleVersion)" />
+  </ItemGroup>
+
+  <!-- 数据存储包组 -->
+  <ItemGroup Label="Data Storage Packages" Condition="'$(UseDataStorage)' == 'true'">
+    <!-- Redis包 -->
+    <PackageReference Include="StackExchange.Redis" Version="$(RedisVersion)" Condition="'$(UseRedis)' == 'true'" />
+    
+    <!-- MongoDB包 -->
+    <PackageReference Include="MongoDB.Driver" Version="$(MongoDriverVersion)" Condition="'$(UseMongoDB)' == 'true'" />
+    
+    <!-- EF Core包 -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="$(EfCoreVersion)" Condition="'$(UseEntityFramework)' == 'true'" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="$(EfCoreVersion)" Condition="'$(UseEntityFramework)' == 'true'" />
+  </ItemGroup>
+
+  <!-- 通用Using指令 -->
+  <ItemGroup Label="Global Usings">
+    <Using Include="System" />
+    <Using Include="System.Collections.Generic" />
+    <Using Include="System.Linq" />
+    <Using Include="System.Threading" />
+    <Using Include="System.Threading.Tasks" />
+  </ItemGroup>
+
+</Project>

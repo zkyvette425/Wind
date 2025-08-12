@@ -1,0 +1,78 @@
+# Wind游戏服务器 - 本地开发环境
+version: '3.8'
+
+services:
+  # Redis服务 - 用于缓存和会话存储
+  wind-redis:
+    image: redis/redis-stack:latest
+    container_name: wind-redis
+    ports:
+      - "6379:6379"     # Redis端口
+      - "8001:8001"     # RedisInsight管理界面
+    environment:
+      - REDIS_ARGS=--requirepass windgame123
+    volumes:
+      - wind_redis_data:/data
+    restart: unless-stopped
+    networks:
+      - wind-network
+
+  # MongoDB服务 - 用于持久化存储
+  wind-mongodb:
+    image: mongo:8.0
+    container_name: wind-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=windadmin
+      - MONGO_INITDB_ROOT_PASSWORD=windgame123
+      - MONGO_INITDB_DATABASE=windgame
+    volumes:
+      - wind_mongo_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    restart: unless-stopped
+    networks:
+      - wind-network
+
+  # Seq日志服务 - 用于结构化日志查看
+  wind-seq:
+    image: datalust/seq:latest
+    container_name: wind-seq
+    ports:
+      - "5341:5341"     # Seq摄取端口
+      - "8080:80"       # Seq Web界面
+    environment:
+      - ACCEPT_EULA=Y
+      - SEQ_FIRSTRUN_ADMINPASSWORDHASH=windgame123
+    volumes:
+      - wind_seq_data:/data
+    restart: unless-stopped
+    networks:
+      - wind-network
+
+  # Jaeger分布式跟踪 - 用于性能监控
+  wind-jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: wind-jaeger
+    ports:
+      - "16686:16686"   # Jaeger Web界面
+      - "14250:14250"   # gRPC
+      - "14268:14268"   # HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    restart: unless-stopped
+    networks:
+      - wind-network
+
+volumes:
+  wind_redis_data:
+    name: wind_redis_data
+  wind_mongo_data:
+    name: wind_mongo_data
+  wind_seq_data:
+    name: wind_seq_data
+
+networks:
+  wind-network:
+    name: wind-network
+    driver: bridge

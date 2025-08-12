@@ -1,15 +1,14 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <!-- 项目类型标识 -->
+    <IsOrleansProject>true</IsOrleansProject>
+    <IsOrleansGrain>true</IsOrleansGrain>
+    <IsMagicOnionProject>true</IsMagicOnionProject>
+    <IsMagicOnionServer>true</IsMagicOnionServer>
+    <UseLogging>true</UseLogging>
+    <UseSerialization>true</UseSerialization>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="MagicOnion.Server" Version="7.0.6" />
-    <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="9.2.1" />
-  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Wind.GrainInterfaces\Wind.GrainInterfaces.csproj" />

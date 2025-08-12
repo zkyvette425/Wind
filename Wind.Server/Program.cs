@@ -1,15 +1,20 @@
 using System.Net;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Serilog;
 using MagicOnion;
 using MagicOnion.Server;
 
-// 配置Serilog日志
+// 从配置文件读取Serilog配置
+var configuration = new ConfigurationBuilder()
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json")
+    .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true)
+    .Build();
+
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Debug()
-    .WriteTo.Console()
-    .WriteTo.File("logs/log.txt", rollingInterval: RollingInterval.Day)
+    .ReadFrom.Configuration(configuration)
     .CreateLogger();
 
 try
@@ -47,16 +52,45 @@ try
     // 添加MagicOnion服务 (基于Context7文档)
     builder.Services.AddMagicOnion();
 
+    // 添加健康检查
+    builder.Services.AddHealthChecks()
+        .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy());
+
     Log.Information("Orleans Silo配置完成，端口: Silo=11111, Gateway=30000");
     Log.Information("MagicOnion服务已添加到DI容器");
+    Log.Information("健康检查服务已配置");
 
     var app = builder.Build();
 
     // 映射MagicOnion服务端点 (基于Context7文档)
     app.MapMagicOnionService();
     
+    // 映射健康检查端点
+    app.MapHealthChecks("/health");
+    app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready")
+    });
+    app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = _ => false
+    });
+    
     // 添加根路径信息端点
-    app.MapGet("/", () => "Wind游戏服务器 - Orleans + MagicOnion");
+    app.MapGet("/", () => new
+    {
+        Service = "Wind游戏服务器",
+        Version = "v1.3",
+        Technology = "Orleans + MagicOnion",
+        Timestamp = DateTime.UtcNow,
+        Endpoints = new
+        {
+            Health = "/health",
+            Ready = "/health/ready", 
+            Live = "/health/live",
+            MagicOnion = "gRPC on port 5271"
+        }
+    });
 
     await app.RunAsync();
 }

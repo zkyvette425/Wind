@@ -1,25 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- 项目类型标识 -->
+    <IsTestProject>true</IsTestProject>
+    <UseEntityFramework>true</UseEntityFramework>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="6.0.2" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="7.0.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
-    <PackageReference Include="Moq" Version="4.20.70" />
-    <PackageReference Include="xunit" Version="2.9.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
-  </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <!-- TODO: Orleans测试项目引用将在v1.0阶段添加 -->
+  <ItemGroup>
+    <ProjectReference Include="..\Wind.GrainInterfaces\Wind.GrainInterfaces.csproj" />
+    <ProjectReference Include="..\Wind.Grains\Wind.Grains.csproj" />
+    <ProjectReference Include="..\Wind.Shared\Wind.Shared.csproj" />
+  </ItemGroup>
 
 </Project>

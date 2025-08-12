@@ -24,11 +24,11 @@ public class HelloGrain : Grain, IHelloGrain
     public Task<string> SayHelloAsync(string name)
     {
         _logger.LogInformation("HelloGrain收到问候请求，姓名: {Name}", name);
-        
+
         var response = $"Hello {name} from Orleans! Grain ID: {this.GetPrimaryKeyString()}";
-        
+
         _logger.LogInformation("HelloGrain响应: {Response}", response);
-        
+
         return Task.FromResult(response);
     }
 }

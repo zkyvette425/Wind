@@ -8,12 +8,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MagicOnion.Client" Version="7.0.6" />
     <PackageReference Include="Microsoft.Orleans.Client" Version="9.2.1" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.8" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Wind.GrainInterfaces\Wind.GrainInterfaces.csproj" />
+    <ProjectReference Include="..\Wind.Shared\Wind.Shared.csproj" />
   </ItemGroup>
 
 </Project>

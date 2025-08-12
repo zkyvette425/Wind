@@ -7,11 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="MagicOnion.Server" Version="7.0.6" />
     <PackageReference Include="Microsoft.Orleans.Core.Abstractions" Version="9.2.1" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Wind.GrainInterfaces\Wind.GrainInterfaces.csproj" />
+    <ProjectReference Include="..\Wind.Shared\Wind.Shared.csproj" />
   </ItemGroup>
 
 </Project>

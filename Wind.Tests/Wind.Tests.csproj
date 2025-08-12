@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Serialization.MessagePack" Version="9.2.1" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.66.0" />
+    <PackageReference Include="MagicOnion.Client" Version="7.0.6" />
   </ItemGroup>
 
 </Project>

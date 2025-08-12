@@ -245,4 +245,176 @@ namespace Wind.Shared.Protocols
         [MPKey(3)]
         public PlayerSettings? Settings { get; set; }
     }
+
+    // ===== PlayerService API响应消息类型 =====
+
+    /// <summary>
+    /// 位置更新响应
+    /// </summary>
+    [MessagePackObject]
+    public class UpdatePositionResponse
+    {
+        [MPKey(0)]
+        public bool Success { get; set; }
+
+        [MPKey(1)]
+        public string Message { get; set; } = string.Empty;
+
+        [MPKey(2)]
+        public PlayerPosition? UpdatedPosition { get; set; }
+    }
+
+    /// <summary>
+    /// 在线状态设置响应
+    /// </summary>
+    [MessagePackObject]
+    public class SetOnlineStatusResponse
+    {
+        [MPKey(0)]
+        public bool Success { get; set; }
+
+        [MPKey(1)]
+        public string Message { get; set; } = string.Empty;
+
+        [MPKey(2)]
+        public PlayerOnlineStatus Status { get; set; }
+    }
+
+    // 注意：JoinRoomResponse 和 LeaveRoomResponse 已在 RoomMessages.cs 中定义
+
+    /// <summary>
+    /// 获取当前房间响应
+    /// </summary>
+    [MessagePackObject]
+    public class GetCurrentRoomResponse
+    {
+        [MPKey(0)]
+        public bool Success { get; set; }
+
+        [MPKey(1)]
+        public string Message { get; set; } = string.Empty;
+
+        [MPKey(2)]
+        public string? CurrentRoomId { get; set; }
+
+        [MPKey(3)]
+        public DateTime? JoinTime { get; set; }
+    }
+
+    /// <summary>
+    /// 统计更新响应
+    /// </summary>
+    [MessagePackObject]
+    public class UpdateStatsResponse
+    {
+        [MPKey(0)]
+        public bool Success { get; set; }
+
+        [MPKey(1)]
+        public string Message { get; set; } = string.Empty;
+
+        [MPKey(2)]
+        public PlayerStats? UpdatedStats { get; set; }
+    }
+
+    /// <summary>
+    /// 设置更新响应
+    /// </summary>
+    [MessagePackObject]
+    public class UpdateSettingsResponse
+    {
+        [MPKey(0)]
+        public bool Success { get; set; }
+
+        [MPKey(1)]
+        public string Message { get; set; } = string.Empty;
+
+        [MPKey(2)]
+        public PlayerSettings? UpdatedSettings { get; set; }
+    }
+
+    /// <summary>
+    /// 在线状态查询响应
+    /// </summary>
+    [MessagePackObject]
+    public class IsOnlineResponse
+    {
+        [MPKey(0)]
+        public bool Success { get; set; }
+
+        [MPKey(1)]
+        public string Message { get; set; } = string.Empty;
+
+        [MPKey(2)]
+        public bool IsOnline { get; set; }
+
+        [MPKey(3)]
+        public PlayerOnlineStatus Status { get; set; }
+
+        [MPKey(4)]
+        public DateTime LastActiveAt { get; set; }
+    }
+
+    /// <summary>
+    /// 最后活跃时间响应
+    /// </summary>
+    [MessagePackObject]
+    public class GetLastActiveTimeResponse
+    {
+        [MPKey(0)]
+        public bool Success { get; set; }
+
+        [MPKey(1)]
+        public string Message { get; set; } = string.Empty;
+
+        [MPKey(2)]
+        public DateTime LastActiveTime { get; set; }
+
+        [MPKey(3)]
+        public TimeSpan TimeSinceLastActive { get; set; }
+    }
+
+    /// <summary>
+    /// 心跳响应
+    /// </summary>
+    [MessagePackObject]
+    public class HeartbeatResponse
+    {
+        [MPKey(0)]
+        public bool Success { get; set; }
+
+        [MPKey(1)]
+        public string Message { get; set; } = string.Empty;
+
+        [MPKey(2)]
+        public DateTime ServerTime { get; set; }
+
+        [MPKey(3)]
+        public DateTime LastActiveTime { get; set; }
+
+        [MPKey(4)]
+        public PlayerOnlineStatus Status { get; set; }
+    }
+
+    /// <summary>
+    /// 会话验证响应
+    /// </summary>
+    [MessagePackObject]
+    public class ValidateSessionResponse
+    {
+        [MPKey(0)]
+        public bool Success { get; set; }
+
+        [MPKey(1)]
+        public string Message { get; set; } = string.Empty;
+
+        [MPKey(2)]
+        public bool IsValid { get; set; }
+
+        [MPKey(3)]
+        public DateTime? SessionExpireTime { get; set; }
+
+        [MPKey(4)]
+        public TimeSpan? TimeUntilExpiry { get; set; }
+    }
 }

@@ -1,0 +1,629 @@
+using MagicOnion;
+using MagicOnion.Server;
+using Microsoft.Extensions.Logging;
+using Orleans;
+using System.ComponentModel.DataAnnotations;
+using Wind.GrainInterfaces;
+using Wind.Shared.Models;
+using Wind.Shared.Protocols;
+using Wind.Shared.Services;
+
+namespace Wind.Server.Services
+{
+    /// <summary>
+    /// 玩家管理MagicOnion Unary服务实现
+    /// 提供RESTful风格的玩家API，连接客户端与Orleans PlayerGrain
+    /// </summary>
+    public class PlayerService : ServiceBase<IPlayerService>, IPlayerService
+    {
+        private readonly IGrainFactory _grainFactory;
+        private readonly ILogger<PlayerService> _logger;
+
+        public PlayerService(IGrainFactory grainFactory, ILogger<PlayerService> logger)
+        {
+            _grainFactory = grainFactory;
+            _logger = logger;
+        }
+
+        /// <summary>
+        /// 玩家登录API
+        /// </summary>
+        public async UnaryResult<PlayerLoginResponse> LoginAsync(PlayerLoginRequest request)
+        {
+            try
+            {
+                // 参数验证
+                if (string.IsNullOrWhiteSpace(request.PlayerId))
+                {
+                    _logger.LogWarning("登录请求参数无效: PlayerId为空");
+                    return new PlayerLoginResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID不能为空"
+                    };
+                }
+
+                _logger.LogInformation("处理玩家登录请求: PlayerId={PlayerId}, Platform={Platform}", 
+                    request.PlayerId, request.Platform);
+
+                // 获取PlayerGrain并调用登录方法
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(request.PlayerId);
+                var response = await playerGrain.LoginAsync(request);
+
+                _logger.LogInformation("玩家登录完成: PlayerId={PlayerId}, Success={Success}", 
+                    request.PlayerId, response.Success);
+
+                return response;
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "玩家登录参数验证失败: PlayerId={PlayerId}", request.PlayerId);
+                return new PlayerLoginResponse
+                {
+                    Success = false,
+                    Message = $"参数验证失败: {ex.Message}"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "玩家登录失败: PlayerId={PlayerId}", request.PlayerId);
+                return new PlayerLoginResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 玩家登出API
+        /// </summary>
+        public async UnaryResult<PlayerLogoutResponse> LogoutAsync(PlayerLogoutRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.PlayerId))
+                {
+                    return new PlayerLogoutResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID不能为空"
+                    };
+                }
+
+                _logger.LogInformation("处理玩家登出请求: PlayerId={PlayerId}", request.PlayerId);
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(request.PlayerId);
+                var response = await playerGrain.LogoutAsync(request);
+
+                _logger.LogInformation("玩家登出完成: PlayerId={PlayerId}, Success={Success}", 
+                    request.PlayerId, response.Success);
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "玩家登出失败: PlayerId={PlayerId}", request.PlayerId);
+                return new PlayerLogoutResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 获取玩家信息API
+        /// </summary>
+        public async UnaryResult<PlayerInfo?> GetPlayerInfoAsync(string playerId, bool includeStats = true, bool includeSettings = false)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(playerId))
+                {
+                    _logger.LogWarning("获取玩家信息请求参数无效: PlayerId为空");
+                    return null;
+                }
+
+                _logger.LogDebug("获取玩家信息: PlayerId={PlayerId}, IncludeStats={IncludeStats}, IncludeSettings={IncludeSettings}", 
+                    playerId, includeStats, includeSettings);
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
+                var playerInfo = await playerGrain.GetPlayerInfoAsync(includeStats, includeSettings);
+
+                return playerInfo;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "获取玩家信息失败: PlayerId={PlayerId}", playerId);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 更新玩家信息API
+        /// </summary>
+        public async UnaryResult<PlayerUpdateResponse> UpdatePlayerAsync(PlayerUpdateRequest request)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.PlayerId))
+                {
+                    return new PlayerUpdateResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID不能为空"
+                    };
+                }
+
+                _logger.LogInformation("更新玩家信息: PlayerId={PlayerId}", request.PlayerId);
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(request.PlayerId);
+                var response = await playerGrain.UpdatePlayerAsync(request);
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "更新玩家信息失败: PlayerId={PlayerId}", request.PlayerId);
+                return new PlayerUpdateResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 更新玩家位置API
+        /// </summary>
+        public async UnaryResult<UpdatePositionResponse> UpdatePlayerPositionAsync(string playerId, PlayerPosition position)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(playerId))
+                {
+                    return new UpdatePositionResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID不能为空"
+                    };
+                }
+
+                _logger.LogDebug("更新玩家位置: PlayerId={PlayerId}, Position=({X}, {Y}, {Z})", 
+                    playerId, position.X, position.Y, position.Z);
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
+                var success = await playerGrain.UpdatePositionAsync(position);
+
+                return new UpdatePositionResponse
+                {
+                    Success = success,
+                    Message = success ? "位置更新成功" : "位置更新失败",
+                    UpdatedPosition = success ? position : null
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "更新玩家位置失败: PlayerId={PlayerId}", playerId);
+                return new UpdatePositionResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 设置在线状态API
+        /// </summary>
+        public async UnaryResult<SetOnlineStatusResponse> SetOnlineStatusAsync(string playerId, PlayerOnlineStatus status)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(playerId))
+                {
+                    return new SetOnlineStatusResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID不能为空"
+                    };
+                }
+
+                _logger.LogInformation("设置玩家在线状态: PlayerId={PlayerId}, Status={Status}", playerId, status);
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
+                var success = await playerGrain.SetOnlineStatusAsync(status);
+
+                return new SetOnlineStatusResponse
+                {
+                    Success = success,
+                    Message = success ? "在线状态设置成功" : "在线状态设置失败",
+                    Status = status
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "设置玩家在线状态失败: PlayerId={PlayerId}", playerId);
+                return new SetOnlineStatusResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 玩家加入房间API
+        /// </summary>
+        public async UnaryResult<JoinRoomResponse> JoinRoomAsync(string playerId, string roomId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(playerId) || string.IsNullOrWhiteSpace(roomId))
+                {
+                    return new JoinRoomResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID和房间ID不能为空"
+                    };
+                }
+
+                _logger.LogInformation("玩家加入房间: PlayerId={PlayerId}, RoomId={RoomId}", playerId, roomId);
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
+                var success = await playerGrain.JoinRoomAsync(roomId);
+
+                return new JoinRoomResponse
+                {
+                    Success = success,
+                    Message = success ? "成功加入房间" : "加入房间失败",
+                    RoomInfo = null // TODO: 如果需要房间信息，需要从RoomGrain获取
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "玩家加入房间失败: PlayerId={PlayerId}, RoomId={RoomId}", playerId, roomId);
+                return new JoinRoomResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 玩家离开房间API
+        /// </summary>
+        public async UnaryResult<LeaveRoomResponse> LeaveRoomAsync(string playerId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(playerId))
+                {
+                    return new LeaveRoomResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID不能为空"
+                    };
+                }
+
+                _logger.LogInformation("玩家离开房间: PlayerId={PlayerId}", playerId);
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
+                
+                // 先获取当前房间ID
+                var currentRoomId = await playerGrain.GetCurrentRoomAsync();
+                
+                // 离开房间
+                var success = await playerGrain.LeaveRoomAsync();
+
+                return new LeaveRoomResponse
+                {
+                    Success = success,
+                    Message = success ? "成功离开房间" : "离开房间失败"
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "玩家离开房间失败: PlayerId={PlayerId}", playerId);
+                return new LeaveRoomResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 获取当前房间API
+        /// </summary>
+        public async UnaryResult<GetCurrentRoomResponse> GetCurrentRoomAsync(string playerId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(playerId))
+                {
+                    return new GetCurrentRoomResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID不能为空"
+                    };
+                }
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
+                var currentRoomId = await playerGrain.GetCurrentRoomAsync();
+
+                return new GetCurrentRoomResponse
+                {
+                    Success = true,
+                    Message = currentRoomId != null ? "获取当前房间成功" : "玩家当前不在任何房间中",
+                    CurrentRoomId = currentRoomId,
+                    JoinTime = null // TODO: 如果需要JoinTime，需要在PlayerGrain中添加相应方法
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "获取当前房间失败: PlayerId={PlayerId}", playerId);
+                return new GetCurrentRoomResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 更新玩家统计信息API
+        /// </summary>
+        public async UnaryResult<UpdateStatsResponse> UpdateStatsAsync(string playerId, PlayerStats stats)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(playerId))
+                {
+                    return new UpdateStatsResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID不能为空"
+                    };
+                }
+
+                _logger.LogInformation("更新玩家统计信息: PlayerId={PlayerId}", playerId);
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
+                var success = await playerGrain.UpdateStatsAsync(stats);
+
+                return new UpdateStatsResponse
+                {
+                    Success = success,
+                    Message = success ? "统计信息更新成功" : "统计信息更新失败",
+                    UpdatedStats = success ? stats : null
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "更新玩家统计信息失败: PlayerId={PlayerId}", playerId);
+                return new UpdateStatsResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 更新玩家设置API
+        /// </summary>
+        public async UnaryResult<UpdateSettingsResponse> UpdateSettingsAsync(string playerId, PlayerSettings settings)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(playerId))
+                {
+                    return new UpdateSettingsResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID不能为空"
+                    };
+                }
+
+                _logger.LogInformation("更新玩家设置: PlayerId={PlayerId}", playerId);
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
+                var success = await playerGrain.UpdateSettingsAsync(settings);
+
+                return new UpdateSettingsResponse
+                {
+                    Success = success,
+                    Message = success ? "设置更新成功" : "设置更新失败",
+                    UpdatedSettings = success ? settings : null
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "更新玩家设置失败: PlayerId={PlayerId}", playerId);
+                return new UpdateSettingsResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 检查玩家是否在线API
+        /// </summary>
+        public async UnaryResult<IsOnlineResponse> IsOnlineAsync(string playerId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(playerId))
+                {
+                    return new IsOnlineResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID不能为空"
+                    };
+                }
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
+                var isOnline = await playerGrain.IsOnlineAsync();
+                var lastActiveTime = await playerGrain.GetLastActiveTimeAsync();
+
+                // 获取玩家完整信息以获取状态
+                var playerInfo = await playerGrain.GetPlayerInfoAsync(false, false);
+
+                return new IsOnlineResponse
+                {
+                    Success = true,
+                    Message = "在线状态查询成功",
+                    IsOnline = isOnline,
+                    Status = playerInfo?.OnlineStatus ?? PlayerOnlineStatus.Offline,
+                    LastActiveAt = lastActiveTime
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "检查玩家在线状态失败: PlayerId={PlayerId}", playerId);
+                return new IsOnlineResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 获取最后活跃时间API
+        /// </summary>
+        public async UnaryResult<GetLastActiveTimeResponse> GetLastActiveTimeAsync(string playerId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(playerId))
+                {
+                    return new GetLastActiveTimeResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID不能为空"
+                    };
+                }
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
+                var lastActiveTime = await playerGrain.GetLastActiveTimeAsync();
+                var timeSinceLastActive = DateTime.UtcNow - lastActiveTime;
+
+                return new GetLastActiveTimeResponse
+                {
+                    Success = true,
+                    Message = "最后活跃时间获取成功",
+                    LastActiveTime = lastActiveTime,
+                    TimeSinceLastActive = timeSinceLastActive
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "获取最后活跃时间失败: PlayerId={PlayerId}", playerId);
+                return new GetLastActiveTimeResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 心跳更新API
+        /// </summary>
+        public async UnaryResult<HeartbeatResponse> HeartbeatAsync(string playerId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(playerId))
+                {
+                    return new HeartbeatResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID不能为空"
+                    };
+                }
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
+                var success = await playerGrain.HeartbeatAsync();
+                var lastActiveTime = await playerGrain.GetLastActiveTimeAsync();
+
+                // 获取当前状态
+                var playerInfo = await playerGrain.GetPlayerInfoAsync(false, false);
+
+                return new HeartbeatResponse
+                {
+                    Success = success,
+                    Message = success ? "心跳更新成功" : "心跳更新失败",
+                    ServerTime = DateTime.UtcNow,
+                    LastActiveTime = lastActiveTime,
+                    Status = playerInfo?.OnlineStatus ?? PlayerOnlineStatus.Offline
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "心跳更新失败: PlayerId={PlayerId}", playerId);
+                return new HeartbeatResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 验证会话有效性API
+        /// </summary>
+        public async UnaryResult<ValidateSessionResponse> ValidateSessionAsync(string playerId, string sessionId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(playerId) || string.IsNullOrWhiteSpace(sessionId))
+                {
+                    return new ValidateSessionResponse
+                    {
+                        Success = false,
+                        Message = "玩家ID和会话ID不能为空"
+                    };
+                }
+
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(playerId);
+                var isValid = await playerGrain.ValidateSessionAsync(sessionId);
+
+                // 如果会话有效，获取会话到期时间（这里简化处理，实际应该从PlayerGrain获取）
+                DateTime? sessionExpireTime = null;
+                TimeSpan? timeUntilExpiry = null;
+
+                if (isValid)
+                {
+                    // TODO: 从PlayerGrain获取实际的会话到期时间
+                    sessionExpireTime = DateTime.UtcNow.AddHours(24); // 假设24小时到期
+                    timeUntilExpiry = sessionExpireTime - DateTime.UtcNow;
+                }
+
+                return new ValidateSessionResponse
+                {
+                    Success = true,
+                    Message = "会话验证完成",
+                    IsValid = isValid,
+                    SessionExpireTime = sessionExpireTime,
+                    TimeUntilExpiry = timeUntilExpiry
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "验证会话有效性失败: PlayerId={PlayerId}, SessionId={SessionId}", playerId, sessionId);
+                return new ValidateSessionResponse
+                {
+                    Success = false,
+                    Message = "内部服务器错误，请稍后重试"
+                };
+            }
+        }
+    }
+}

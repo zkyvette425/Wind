@@ -67,7 +67,7 @@ try
 
     Log.Information("Orleans Silo配置完成，端口: Silo=11111, Gateway=30000");
     Log.Information("Orleans存储配置: PlayerStorage, RoomStorage, MatchmakingStorage (Memory)");
-    Log.Information("MagicOnion服务已添加到DI容器");
+    Log.Information("MagicOnion服务已添加到DI容器，将自动发现PlayerService等服务");
     Log.Information("健康检查服务已配置");
 
     var app = builder.Build();

@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Wind.Shared.Services;
 using Wind.Shared.Models;
+using Wind.Shared.Protocols;
 using Wind.GrainInterfaces;
 using Orleans;
 using MagicOnion.Server;
@@ -580,7 +581,12 @@ namespace Wind.Server.Services
                         try
                         {
                             var roomGrain = _grainFactory.GetGrain<IRoomGrain>(_currentRoomId);
-                            await roomGrain.SetPlayerReadyAsync(playerId, isReady);
+                            await roomGrain.SetPlayerReadyAsync(new PlayerReadyRequest 
+                            { 
+                                RoomId = _currentRoomId,
+                                PlayerId = playerId, 
+                                ReadyStatus = isReady ? PlayerReadyStatus.Ready : PlayerReadyStatus.NotReady 
+                            });
                         }
                         catch (Exception grainEx)
                         {
@@ -614,7 +620,8 @@ namespace Wind.Server.Services
                     try
                     {
                         var roomGrain = _grainFactory.GetGrain<IRoomGrain>(roomId);
-                        var roomState = await roomGrain.GetRoomStateAsync();
+                        var roomInfoResponse = await roomGrain.GetRoomInfoAsync(new GetRoomInfoRequest { RoomId = roomId });
+                        var roomState = roomInfoResponse?.RoomInfo;
                         
                         if (roomState != null)
                         {
@@ -622,7 +629,7 @@ namespace Wind.Server.Services
                             await _roomBroadcaster.BroadcastGameStarted(_currentRoom, roomState);
                             
                             // 同时通知RoomGrain游戏开始
-                            await roomGrain.StartGameAsync();
+                            await roomGrain.StartGameAsync(new StartGameRequest { RoomId = roomId });
                         }
                         else
                         {
@@ -666,7 +673,8 @@ namespace Wind.Server.Services
                     try
                     {
                         var roomGrain = _grainFactory.GetGrain<IRoomGrain>(roomId);
-                        var roomState = await roomGrain.GetRoomStateAsync();
+                        var roomInfoResponse = await roomGrain.GetRoomInfoAsync(new GetRoomInfoRequest { RoomId = roomId });
+                        var roomState = roomInfoResponse?.RoomInfo;
                         
                         if (roomState != null)
                         {
@@ -685,7 +693,14 @@ namespace Wind.Server.Services
                             await _roomBroadcaster.BroadcastGameEnded(_currentRoom, roomState, gameResultDict);
                             
                             // 同时通知RoomGrain游戏结束
-                            await roomGrain.EndGameAsync(gameResultDict);
+                            await roomGrain.EndGameAsync(new EndGameRequest 
+                            { 
+                                RoomId = roomId,
+                                PlayerId = Context.ContextId.ToString(), // 使用当前连接的玩家ID
+                                FinalScores = gameResultDict.ContainsKey("scores") ? 
+                                    (Dictionary<string, int>)(gameResultDict["scores"] ?? new Dictionary<string, int>()) :
+                                    new Dictionary<string, int>()
+                            });
                         }
                         else
                         {

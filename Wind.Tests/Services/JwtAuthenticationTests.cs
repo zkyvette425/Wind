@@ -5,7 +5,7 @@ using System.Security.Claims;
 using Wind.Server.Services;
 using Wind.Shared.Auth;
 using Wind.Shared.Protocols;
-using Wind.Tests.Fixtures;
+using Wind.Tests.TestFixtures;
 using Xunit.Abstractions;
 
 namespace Wind.Tests.Services

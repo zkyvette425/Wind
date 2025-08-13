@@ -264,7 +264,7 @@ namespace Wind.Server.Services
             try
             {
                 var gameSettings = JsonSerializer.Serialize(roomState.Settings);
-                var startTimestamp = roomState.GameStartTime?.ToUnixTimeSeconds() ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                var startTimestamp = new DateTimeOffset(roomState.GameStartTime ?? DateTime.UtcNow).ToUnixTimeSeconds();
                 
                 // 广播游戏开始
                 room.All.OnGameStart(roomState.RoomId, gameSettings, startTimestamp);
@@ -299,7 +299,7 @@ namespace Wind.Server.Services
             try
             {
                 var gameResultJson = JsonSerializer.Serialize(gameResult);
-                var endTimestamp = roomState.GameEndTime?.ToUnixTimeSeconds() ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                var endTimestamp = new DateTimeOffset(roomState.GameEndTime ?? DateTime.UtcNow).ToUnixTimeSeconds();
                 
                 // 广播游戏结束
                 room.All.OnGameEnd(roomState.RoomId, gameResultJson, endTimestamp);
@@ -374,7 +374,7 @@ namespace Wind.Server.Services
             try
             {
                 var eventType = roomEvent.EventType.ToString().ToUpper();
-                var timestamp = roomEvent.Timestamp.ToUnixTimeSeconds();
+                var timestamp = new DateTimeOffset(roomEvent.Timestamp).ToUnixTimeSeconds();
                 
                 // 根据事件类型发送相应通知
                 switch (roomEvent.EventType)

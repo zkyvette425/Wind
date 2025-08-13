@@ -8,7 +8,7 @@ using Wind.Server.Services;
 using Wind.Shared.Auth;
 using Wind.Shared.Protocols;
 using Wind.Shared.Services;
-using Wind.Tests.Fixtures;
+using Wind.Tests.TestFixtures;
 using Xunit.Abstractions;
 
 namespace Wind.Tests.Integration

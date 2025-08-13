@@ -462,13 +462,25 @@ namespace Wind.Shared.Protocols
         public string MessageId { get; set; } = string.Empty;
 
         [MessagePack.Key(3)]
-        public DateTime SentAt { get; set; }
+        public DateTime SentAt { get; set; } = DateTime.UtcNow;
 
         [MessagePack.Key(4)]
         public List<string> DeliveredTo { get; set; } = new();
 
         [MessagePack.Key(5)]
         public List<string> FailedDeliveries { get; set; } = new();
+
+        [MessagePack.Key(6)]
+        public int DeliveredCount { get; set; }
+
+        [MessagePack.Key(7)]
+        public int FailedCount { get; set; }
+
+        [MessagePack.Key(8)]
+        public List<string> FailedTargets { get; set; } = new();
+
+        [MessagePack.Key(9)]
+        public long DeliveryTime { get; set; }
     }
 
     /// <summary>
@@ -528,7 +540,7 @@ namespace Wind.Shared.Protocols
 
         [MessagePack.Key(1)]
         [Required]
-        public string ReceiverId { get; set; } = string.Empty;
+        public string SubscriberId { get; set; } = string.Empty;
 
         [MessagePack.Key(2)]
         public DateTime ReceivedAt { get; set; } = DateTime.UtcNow;
@@ -553,7 +565,13 @@ namespace Wind.Shared.Protocols
         public string Message { get; set; } = string.Empty;
 
         [MessagePack.Key(2)]
-        public DateTime AcknowledgedAt { get; set; }
+        public string MessageId { get; set; } = string.Empty;
+
+        [MessagePack.Key(3)]
+        public string SubscriberId { get; set; } = string.Empty;
+
+        [MessagePack.Key(4)]
+        public DateTime AcknowledgedAt { get; set; } = DateTime.UtcNow;
     }
 
     /// <summary>
@@ -572,18 +590,21 @@ namespace Wind.Shared.Protocols
         public MessageType? MessageType { get; set; }
 
         [MessagePack.Key(3)]
-        public DateTime? FromTime { get; set; }
+        public List<MessageType>? MessageTypes { get; set; }
 
         [MessagePack.Key(4)]
-        public DateTime? ToTime { get; set; }
+        public DateTime? StartTime { get; set; }
 
         [MessagePack.Key(5)]
-        public int Limit { get; set; } = 50;
+        public DateTime? EndTime { get; set; }
 
         [MessagePack.Key(6)]
-        public int Offset { get; set; } = 0;
+        public int Limit { get; set; } = 50;
 
         [MessagePack.Key(7)]
+        public int Offset { get; set; } = 0;
+
+        [MessagePack.Key(8)]
         public bool IncludeMetadata { get; set; } = false;
     }
 
@@ -619,21 +640,24 @@ namespace Wind.Shared.Protocols
     public class MessageFilter
     {
         [MessagePack.Key(0)]
-        public List<MessageType> MessageTypes { get; set; } = new();
+        public List<MessageType>? AllowedMessageTypes { get; set; }
 
         [MessagePack.Key(1)]
-        public List<string> SenderIds { get; set; } = new();
+        public List<string>? AllowedSenders { get; set; }
 
         [MessagePack.Key(2)]
-        public List<string> RoomIds { get; set; } = new();
+        public List<string>? BlockedSenders { get; set; }
 
         [MessagePack.Key(3)]
-        public MessagePriority? MinPriority { get; set; }
+        public List<string>? AllowedRooms { get; set; }
 
         [MessagePack.Key(4)]
-        public Dictionary<string, string> MetadataFilters { get; set; } = new();
+        public MessagePriority? MinimumPriority { get; set; }
 
         [MessagePack.Key(5)]
+        public Dictionary<string, string> MetadataFilters { get; set; } = new();
+
+        [MessagePack.Key(6)]
         public bool IncludeSystemMessages { get; set; } = true;
     }
 
@@ -648,13 +672,16 @@ namespace Wind.Shared.Protocols
         public string SubscriberId { get; set; } = string.Empty;
 
         [MessagePack.Key(1)]
-        public MessageFilter Filter { get; set; } = new();
+        public MessageFilter? Filter { get; set; }
 
         [MessagePack.Key(2)]
         public bool ReceiveHistoricalMessages { get; set; } = false;
 
         [MessagePack.Key(3)]
         public int HistoricalMessageLimit { get; set; } = 100;
+
+        [MessagePack.Key(4)]
+        public string? SubscriptionId { get; set; }
     }
 
     /// <summary>
@@ -670,10 +697,13 @@ namespace Wind.Shared.Protocols
         public string Message { get; set; } = string.Empty;
 
         [MessagePack.Key(2)]
-        public string SubscriptionId { get; set; } = string.Empty;
+        public string SubscriberId { get; set; } = string.Empty;
 
         [MessagePack.Key(3)]
-        public DateTime SubscribedAt { get; set; }
+        public string SubscriptionId { get; set; } = string.Empty;
+
+        [MessagePack.Key(4)]
+        public DateTime SubscribedAt { get; set; } = DateTime.UtcNow;
     }
 
     /// <summary>
@@ -704,6 +734,9 @@ namespace Wind.Shared.Protocols
         public string Message { get; set; } = string.Empty;
 
         [MessagePack.Key(2)]
-        public DateTime UnsubscribedAt { get; set; }
+        public string SubscriberId { get; set; } = string.Empty;
+
+        [MessagePack.Key(3)]
+        public DateTime UnsubscribedAt { get; set; } = DateTime.UtcNow;
     }
 }

@@ -186,6 +186,9 @@ namespace Wind.GrainInterfaces
 
         [MessagePack.Key(9)]
         public Dictionary<MessagePriority, long> MessageCountByPriority { get; set; } = new();
+
+        [MessagePack.Key(10)]
+        public double MessageProcessingRate { get; set; }
     }
 
     /// <summary>

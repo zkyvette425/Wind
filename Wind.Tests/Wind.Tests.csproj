@@ -15,6 +15,7 @@
     <ProjectReference Include="..\Wind.GrainInterfaces\Wind.GrainInterfaces.csproj" />
     <ProjectReference Include="..\Wind.Grains\Wind.Grains.csproj" />
     <ProjectReference Include="..\Wind.Shared\Wind.Shared.csproj" />
+    <ProjectReference Include="..\Wind.Server\Wind.Server.csproj" />
   </ItemGroup>
 
   <ItemGroup>

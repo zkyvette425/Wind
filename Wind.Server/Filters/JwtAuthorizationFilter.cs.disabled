@@ -1,0 +1,170 @@
+using MagicOnion.Server;
+using MagicOnion.Server.Filters;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using System.Security.Claims;
+using Wind.Server.Services;
+
+namespace Wind.Server.Filters
+{
+    /// <summary>
+    /// MagicOnion JWT认证授权过滤器
+    /// 在方法执行前验证JWT令牌有效性
+    /// </summary>
+    public class JwtAuthorizationFilter : MagicOnionFilterAttribute
+    {
+        public override async ValueTask Invoke(ServiceContext context, Func<ServiceContext, ValueTask> next)
+        {
+            // 获取服务
+            var jwtService = context.ServiceProvider.GetService<JwtService>();
+            var logger = context.ServiceProvider.GetService<ILogger<JwtAuthorizationFilter>>();
+
+            if (jwtService == null || logger == null)
+            {
+                await next(context);
+                return;
+            }
+
+            // 检查方法是否需要认证
+            var requiresAuth = ShouldRequireAuthentication(context);
+            
+            if (!requiresAuth)
+            {
+                await next(context);
+                return;
+            }
+
+            // 从gRPC Headers中提取JWT令牌
+            var token = ExtractJwtToken(context);
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                logger.LogWarning("受保护的方法缺少JWT令牌: {MethodName}", context.MethodHandler.MethodName);
+                throw new UnauthorizedAccessException("缺少认证令牌");
+            }
+
+            // 验证JWT令牌
+            var validationResult = jwtService.ValidateAccessToken(token);
+            if (!validationResult.IsValid)
+            {
+                logger.LogWarning("JWT令牌验证失败: {Error}, 方法: {MethodName}", 
+                    validationResult.Error, context.MethodHandler.MethodName);
+                throw new UnauthorizedAccessException($"令牌验证失败: {validationResult.Error}");
+            }
+
+            // 将用户信息设置到上下文中
+            if (validationResult.Principal != null)
+            {
+                var playerId = validationResult.Principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                
+                // 设置认证用户到HTTP上下文（如果可用）
+                var httpContext = context.CallContext.GetHttpContext();
+                if (httpContext != null)
+                {
+                    httpContext.User = validationResult.Principal;
+                }
+
+                logger.LogDebug("JWT认证成功: PlayerId={PlayerId}, 方法: {MethodName}", 
+                    playerId, context.MethodHandler.MethodName);
+            }
+
+            // 继续执行方法
+            await next(context);
+        }
+
+        /// <summary>
+        /// 判断方法是否需要认证
+        /// </summary>
+        private static bool ShouldRequireAuthentication(ServiceContext context)
+        {
+            var methodName = context.MethodHandler.MethodName;
+            
+            // 不需要认证的方法列表
+            var publicMethods = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "LoginAsync",           // 登录方法
+                "RefreshTokenAsync",    // 令牌刷新（有自己的验证逻辑）
+                "ValidateTokenAsync"    // 令牌验证（公开方法）
+            };
+
+            return !publicMethods.Contains(methodName);
+        }
+
+        /// <summary>
+        /// 从gRPC Headers中提取JWT令牌
+        /// </summary>
+        private static string? ExtractJwtToken(ServiceContext context)
+        {
+            try
+            {
+                // 从HTTP上下文的Authorization header中获取令牌
+                var httpContext = context.CallContext.GetHttpContext();
+                if (httpContext != null)
+                {
+                    var authHeader = httpContext.Request.Headers.Authorization.FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return authHeader.Substring(7); // 移除 "Bearer " 前缀
+                    }
+                }
+
+                // 尝试从gRPC metadata中获取
+                var headers = context.CallContext.RequestHeaders;
+                if (headers != null)
+                {
+                    var authEntry = headers.FirstOrDefault(h => 
+                        string.Equals(h.Key, "authorization", StringComparison.OrdinalIgnoreCase));
+                    
+                    if (!string.IsNullOrEmpty(authEntry.Value) && 
+                        authEntry.Value.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return authEntry.Value.Substring(7); // 移除 "Bearer " 前缀
+                    }
+
+                    // 也检查直接的 'token' header
+                    var tokenEntry = headers.FirstOrDefault(h => 
+                        string.Equals(h.Key, "token", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(h.Key, "jwt", StringComparison.OrdinalIgnoreCase));
+                    
+                    if (!string.IsNullOrEmpty(tokenEntry.Value))
+                    {
+                        return tokenEntry.Value;
+                    }
+                }
+
+                return null;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 简化的授权特性标记，用于标识需要认证的方法
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
+    public class RequireAuthenticationAttribute : Attribute
+    {
+        public string? Policy { get; set; }
+        public string[]? Roles { get; set; }
+        public string? RequiredClaim { get; set; }
+
+        public RequireAuthenticationAttribute()
+        {
+        }
+
+        public RequireAuthenticationAttribute(string policy)
+        {
+            Policy = policy;
+        }
+    }
+
+    /// <summary>
+    /// 允许匿名访问的特性标记
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
+    public class AllowAnonymousAttribute : Attribute
+    {
+    }
+}

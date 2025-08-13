@@ -123,5 +123,36 @@ namespace Wind.Shared.Services
         /// <param name="sessionId">会话ID</param>
         /// <returns>会话验证响应</returns>
         UnaryResult<ValidateSessionResponse> ValidateSessionAsync(string playerId, string sessionId);
+
+        // === JWT认证相关方法 ===
+
+        /// <summary>
+        /// 刷新访问令牌API
+        /// </summary>
+        /// <param name="request">刷新令牌请求</param>
+        /// <returns>新的令牌对</returns>
+        UnaryResult<RefreshTokenResponse> RefreshTokenAsync(RefreshTokenRequest request);
+
+        /// <summary>
+        /// 验证访问令牌API
+        /// </summary>
+        /// <param name="request">令牌验证请求</param>
+        /// <returns>验证结果</returns>
+        UnaryResult<ValidateTokenResponse> ValidateTokenAsync(ValidateTokenRequest request);
+
+        /// <summary>
+        /// 撤销令牌API
+        /// </summary>
+        /// <param name="request">令牌撤销请求</param>
+        /// <returns>撤销结果</returns>
+        UnaryResult<RevokeTokenResponse> RevokeTokenAsync(RevokeTokenRequest request);
+
+        /// <summary>
+        /// 获取当前已认证用户信息API
+        /// 需要有效的JWT令牌
+        /// </summary>
+        /// <param name="request">获取用户信息请求</param>
+        /// <returns>当前用户信息</returns>
+        UnaryResult<GetCurrentUserResponse> GetCurrentUserAsync(GetCurrentUserRequest request);
     }
 }

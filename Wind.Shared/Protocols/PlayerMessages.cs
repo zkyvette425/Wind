@@ -49,6 +49,22 @@ namespace Wind.Shared.Protocols
 
         [MPKey(4)]
         public PlayerInfo? PlayerInfo { get; set; }
+
+        // JWT认证相关字段
+        [MPKey(5)]
+        public string? AccessToken { get; set; }
+
+        [MPKey(6)]
+        public string? RefreshToken { get; set; }
+
+        [MPKey(7)]
+        public DateTime? AccessTokenExpiry { get; set; }
+
+        [MPKey(8)]
+        public DateTime? RefreshTokenExpiry { get; set; }
+
+        [MPKey(9)]
+        public string TokenType { get; set; } = "Bearer";
     }
 
     /// <summary>

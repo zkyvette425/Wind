@@ -320,13 +320,17 @@ namespace Wind.Tests.PlayerGrainTests
             var playerId = $"unit-nulls-{Guid.NewGuid():N}";
             var playerGrain = _fixture.Cluster.GrainFactory.GetGrain<IPlayerGrain>(playerId);
 
+            // 首先获取当前状态以获取正确的版本号
+            var currentState = await playerGrain.GetFullStateAsync();
+            var currentVersion = currentState!.Version;
+
             // Act & Assert - 空值处理测试
             var updateWithNulls = new PlayerUpdateRequest
             {
                 DisplayName = null, // null 值应该被忽略
                 Position = null,
                 Settings = null,
-                Version = 0
+                Version = currentVersion // 使用正确的版本号
             };
 
             var response = await playerGrain.UpdatePlayerAsync(updateWithNulls);

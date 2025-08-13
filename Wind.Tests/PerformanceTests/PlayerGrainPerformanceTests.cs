@@ -453,5 +453,110 @@ namespace Wind.Tests.PerformanceTests
 
             _output.WriteLine($"🎉 所有性能指标均满足要求！");
         }
+
+        [Fact]
+        public async Task PlayerGrain_Should_Handle_1000_Plus_Concurrent_Connections()
+        {
+            // Arrange - 1000+并发连接测试
+            const int concurrentCount = 1200; // 超过1000的目标
+            var stopwatch = Stopwatch.StartNew();
+
+            _output.WriteLine($"🚀 开始 {concurrentCount} 并发连接测试...");
+
+            // Act - 并发登录和状态同步测试
+            var tasks = Enumerable.Range(0, concurrentCount).Select(async i =>
+            {
+                var playerId = $"mass-test-{i:D4}";
+                var playerGrain = _fixture.Cluster.GrainFactory.GetGrain<IPlayerGrain>(playerId);
+
+                var startTime = stopwatch.ElapsedMilliseconds;
+                try
+                {
+                    // 1. 登录
+                    var loginResult = await playerGrain.LoginAsync(new PlayerLoginRequest
+                    {
+                        PlayerId = playerId,
+                        DisplayName = $"大规模测试-{i}",
+                        ClientVersion = "1.0.0",
+                        Platform = "MassTest",
+                        DeviceId = $"device-{i % 100}" // 模拟100个设备
+                    });
+
+                    if (!loginResult.Success)
+                        return new { Success = false, ResponseTime = stopwatch.ElapsedMilliseconds - startTime, PlayerId = playerId };
+
+                    // 2. 状态同步操作
+                    var syncTasks = new[]
+                    {
+                        playerGrain.HeartbeatAsync(),
+                        playerGrain.UpdatePositionAsync(new PlayerPosition 
+                        { 
+                            X = i % 1000, 
+                            Y = (i * 7) % 1000, 
+                            Z = (i * 13) % 100 
+                        }),
+                        playerGrain.SetOnlineStatusAsync(i % 2 == 0 ? PlayerOnlineStatus.Online : PlayerOnlineStatus.Away),
+                        playerGrain.IsOnlineAsync().ContinueWith(t => t.Result)
+                    };
+
+                    var syncResults = await Task.WhenAll(syncTasks);
+                    var allSyncSuccess = syncResults.Take(3).All(r => (bool)r); // 前3个返回bool
+
+                    var endTime = stopwatch.ElapsedMilliseconds;
+                    return new
+                    {
+                        Success = allSyncSuccess,
+                        ResponseTime = endTime - startTime,
+                        PlayerId = playerId
+                    };
+                }
+                catch (Exception ex)
+                {
+                    var errorTime = stopwatch.ElapsedMilliseconds;
+                    _output.WriteLine($"❌ 玩家 {playerId} 操作失败: {ex.Message}");
+                    return new
+                    {
+                        Success = false,
+                        ResponseTime = errorTime - startTime,
+                        PlayerId = playerId
+                    };
+                }
+            });
+
+            var results = await Task.WhenAll(tasks);
+            var totalTime = stopwatch.ElapsedMilliseconds;
+
+            // Assert - 验证性能指标
+            var successCount = results.Count(r => r.Success);
+            var successRate = successCount * 100.0 / concurrentCount;
+            var averageResponseTime = results.Average(r => r.ResponseTime);
+            var maxResponseTime = results.Max(r => r.ResponseTime);
+            var minResponseTime = results.Min(r => r.ResponseTime);
+            var throughput = concurrentCount * 1000.0 / totalTime; // connections per second
+
+            // 95th percentile response time
+            var sortedTimes = results.Select(r => r.ResponseTime).OrderBy(t => t).ToArray();
+            var p95ResponseTime = sortedTimes[(int)(sortedTimes.Length * 0.95)];
+
+            _output.WriteLine($"📊 大规模并发测试结果:");
+            _output.WriteLine($"   - 并发连接数: {concurrentCount}");
+            _output.WriteLine($"   - 成功连接数: {successCount}");
+            _output.WriteLine($"   - 成功率: {successRate:F2}%");
+            _output.WriteLine($"   - 总测试时间: {totalTime}ms");
+            _output.WriteLine($"   - 平均响应时间: {averageResponseTime:F2}ms");
+            _output.WriteLine($"   - 最小响应时间: {minResponseTime}ms");
+            _output.WriteLine($"   - 最大响应时间: {maxResponseTime}ms");
+            _output.WriteLine($"   - 95th百分位响应时间: {p95ResponseTime}ms");
+            _output.WriteLine($"   - 系统吞吐量: {throughput:F1} connections/sec");
+
+            // 性能要求验证 - 适当放宽标准以适应大规模测试
+            Assert.True(successRate >= 95.0, $"成功率 {successRate:F2}% 低于95%要求");
+            Assert.True(averageResponseTime < 200, $"平均响应时间 {averageResponseTime:F2}ms 超过200ms目标");
+            Assert.True(p95ResponseTime < 500, $"95th百分位响应时间 {p95ResponseTime}ms 超过500ms阈值");
+            Assert.True(maxResponseTime < 2000, $"最大响应时间 {maxResponseTime}ms 超过2秒阈值");
+            Assert.True(throughput > 50, $"系统吞吐量 {throughput:F1} connections/sec 低于50 connections/sec要求");
+
+            _output.WriteLine($"✅ 1000+并发连接测试通过！系统满足高并发要求。");
+        }
     }
 }

@@ -383,6 +383,13 @@ namespace Wind.Grains
         public async Task<bool> ValidateSessionAsync(string sessionId)
         {
             await Task.CompletedTask;
+            
+            // 检查输入参数有效性
+            if (string.IsNullOrEmpty(sessionId))
+            {
+                return false;
+            }
+            
             EnsurePlayerStateInitialized();
             return _playerState!.Session.SessionId == sessionId && 
                    _playerState.Session.SessionExpireTime > DateTime.UtcNow;

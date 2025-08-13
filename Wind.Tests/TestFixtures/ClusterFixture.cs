@@ -5,6 +5,8 @@ using Orleans.TestingHost;
 using Orleans.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
+using Wind.Server.Services;
+using Microsoft.Extensions.Options;
 
 namespace Wind.Tests.TestFixtures;
 
@@ -63,6 +65,34 @@ public class TestSiloConfigurator : ISiloConfigurator
                 {
                     serializerBuilder.AddMessagePackSerializer();
                 });
+                
+                // 添加限流服务配置
+                services.Configure<RateLimitOptions>(options =>
+                {
+                    options.DefaultPolicy = new RateLimitPolicy
+                    {
+                        Name = "TestDefault",
+                        WindowSize = TimeSpan.FromSeconds(10),
+                        MaxRequests = 100,
+                        GlobalMaxRequests = 1000
+                    };
+                    options.EndpointPolicies = new Dictionary<string, RateLimitPolicy>
+                    {
+                        ["LoginAsync"] = new RateLimitPolicy
+                        {
+                            Name = "TestLogin",
+                            WindowSize = TimeSpan.FromMinutes(1),
+                            MaxRequests = 10,
+                            GlobalMaxRequests = 100
+                        }
+                    };
+                    options.WhitelistedClients = new List<string>();
+                    options.EnableRateLimit = true;
+                    options.EnableLogging = false; // 测试时关闭日志
+                });
+                
+                // 注册限流服务
+                services.AddSingleton<RateLimitingService>();
             });
     }
 }

@@ -8,7 +8,7 @@ using Wind.GrainInterfaces;
 using Wind.Shared.Models;
 using Wind.Shared.Protocols;
 using Wind.Shared.Services;
-// using Wind.Server.Filters; // 临时禁用，待MagicOnion API兼容性修复
+using Wind.Server.Filters;
 
 namespace Wind.Server.Services
 {
@@ -32,6 +32,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 玩家登录API
         /// </summary>
+        [LoginRateLimit]
         public async UnaryResult<PlayerLoginResponse> LoginAsync(PlayerLoginRequest request)
         {
             try
@@ -121,6 +122,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 玩家登出API
         /// </summary>
+        [StandardRateLimit]
         public async UnaryResult<PlayerLogoutResponse> LogoutAsync(PlayerLogoutRequest request)
         {
             try
@@ -158,6 +160,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 获取玩家信息API
         /// </summary>
+        [HighFrequencyRateLimit]
         public async UnaryResult<PlayerInfo?> GetPlayerInfoAsync(string playerId, bool includeStats = true, bool includeSettings = false)
         {
             try
@@ -186,6 +189,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 更新玩家信息API
         /// </summary>
+        [StandardRateLimit]
         public async UnaryResult<PlayerUpdateResponse> UpdatePlayerAsync(PlayerUpdateRequest request)
         {
             try
@@ -220,6 +224,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 更新玩家位置API
         /// </summary>
+        [HighFrequencyRateLimit]
         public async UnaryResult<UpdatePositionResponse> UpdatePlayerPositionAsync(string playerId, PlayerPosition position)
         {
             try
@@ -260,6 +265,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 设置在线状态API
         /// </summary>
+        [StandardRateLimit]
         public async UnaryResult<SetOnlineStatusResponse> SetOnlineStatusAsync(string playerId, PlayerOnlineStatus status)
         {
             try
@@ -299,6 +305,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 玩家加入房间API
         /// </summary>
+        [StandardRateLimit]
         public async UnaryResult<JoinRoomResponse> JoinRoomAsync(string playerId, string roomId)
         {
             try
@@ -338,6 +345,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 玩家离开房间API
         /// </summary>
+        [StandardRateLimit]
         public async UnaryResult<LeaveRoomResponse> LeaveRoomAsync(string playerId)
         {
             try
@@ -381,6 +389,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 获取当前房间API
         /// </summary>
+        [HighFrequencyRateLimit]
         public async UnaryResult<GetCurrentRoomResponse> GetCurrentRoomAsync(string playerId)
         {
             try
@@ -419,6 +428,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 更新玩家统计信息API
         /// </summary>
+        [StandardRateLimit]
         public async UnaryResult<UpdateStatsResponse> UpdateStatsAsync(string playerId, PlayerStats stats)
         {
             try
@@ -458,6 +468,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 更新玩家设置API
         /// </summary>
+        [StandardRateLimit]
         public async UnaryResult<UpdateSettingsResponse> UpdateSettingsAsync(string playerId, PlayerSettings settings)
         {
             try
@@ -497,6 +508,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 检查玩家是否在线API
         /// </summary>
+        [HighFrequencyRateLimit]
         public async UnaryResult<IsOnlineResponse> IsOnlineAsync(string playerId)
         {
             try
@@ -540,6 +552,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 获取最后活跃时间API
         /// </summary>
+        [HighFrequencyRateLimit]
         public async UnaryResult<GetLastActiveTimeResponse> GetLastActiveTimeAsync(string playerId)
         {
             try
@@ -579,6 +592,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 心跳更新API
         /// </summary>
+        [HighFrequencyRateLimit]
         public async UnaryResult<HeartbeatResponse> HeartbeatAsync(string playerId)
         {
             try
@@ -622,6 +636,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 验证会话有效性API
         /// </summary>
+        [StandardRateLimit]
         public async UnaryResult<ValidateSessionResponse> ValidateSessionAsync(string playerId, string sessionId)
         {
             try
@@ -674,6 +689,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 刷新访问令牌API
         /// </summary>
+        [StandardRateLimit]
         public async UnaryResult<RefreshTokenResponse> RefreshTokenAsync(RefreshTokenRequest request)
         {
             try
@@ -728,6 +744,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 验证访问令牌API
         /// </summary>
+        [HighFrequencyRateLimit]
         public async UnaryResult<ValidateTokenResponse> ValidateTokenAsync(ValidateTokenRequest request)
         {
             try
@@ -799,6 +816,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 撤销令牌API
         /// </summary>
+        [StandardRateLimit]
         public async UnaryResult<RevokeTokenResponse> RevokeTokenAsync(RevokeTokenRequest request)
         {
             try
@@ -857,6 +875,7 @@ namespace Wind.Server.Services
         /// <summary>
         /// 获取当前已认证用户信息API
         /// </summary>
+        [StandardRateLimit]
         public async UnaryResult<GetCurrentUserResponse> GetCurrentUserAsync(GetCurrentUserRequest request)
         {
             try

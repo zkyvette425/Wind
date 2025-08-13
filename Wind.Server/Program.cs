@@ -13,6 +13,7 @@ using System.Text;
 using System.Security.Claims;
 using Wind.Shared.Auth;
 using Wind.Server.Services;
+using Wind.Server.Middleware;
 
 // 从配置文件读取Serilog配置
 var configuration = new ConfigurationBuilder()
@@ -81,6 +82,52 @@ try
 
     // 注册JWT服务
     builder.Services.AddSingleton<JwtService>();
+    
+    // 注册限流服务
+    builder.Services.AddRateLimit(options =>
+    {
+        // 配置默认限流策略
+        options.DefaultPolicy = new RateLimitPolicy
+        {
+            Name = "Default",
+            WindowSize = TimeSpan.FromMinutes(1),
+            MaxRequests = 60, // 每分钟60请求
+            GlobalMaxRequests = 10000 // 全局每分钟10000请求
+        };
+
+        // 配置端点特定策略
+        options.EndpointPolicies = new Dictionary<string, RateLimitPolicy>
+        {
+            ["LoginAsync"] = new RateLimitPolicy
+            {
+                Name = "Login",
+                WindowSize = TimeSpan.FromMinutes(1),
+                MaxRequests = 10, // 登录更严格
+                GlobalMaxRequests = 1000
+            },
+            ["RegisterAsync"] = new RateLimitPolicy
+            {
+                Name = "Register", 
+                WindowSize = TimeSpan.FromMinutes(5),
+                MaxRequests = 3, // 注册最严格
+                GlobalMaxRequests = 100
+            },
+            ["GetPlayerInfoAsync"] = new RateLimitPolicy
+            {
+                Name = "PlayerInfo",
+                WindowSize = TimeSpan.FromMinutes(1),
+                MaxRequests = 120, // 查询类API较宽松
+                GlobalMaxRequests = 5000
+            }
+        };
+
+        // 白名单客户端（如果有）
+        options.WhitelistedClients = new List<string>();
+
+        // 启用限流和日志
+        options.EnableRateLimit = true;
+        options.EnableLogging = true;
+    });
     
     // 配置JWT Bearer认证
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -158,6 +205,9 @@ try
 
     var app = builder.Build();
 
+    // 启用限流中间件 (在认证之前)
+    app.UseRateLimit();
+    
     // 启用认证和授权中间件 (必须在MagicOnion之前)
     app.UseAuthentication();
     app.UseAuthorization();

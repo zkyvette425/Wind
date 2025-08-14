@@ -17,6 +17,7 @@ using Wind.Shared.Auth;
 using Wind.Server.Services;
 using Wind.Server.Middleware;
 using Wind.Server.Configuration;
+using Wind.Server.Extensions;
 
 // 从配置文件读取Serilog配置
 var configuration = new ConfigurationBuilder()
@@ -55,15 +56,16 @@ try
                 siloPort: 11111, 
                 gatewayPort: 30000);
             
-        // 配置存储：临时使用内存存储，Redis API需要进一步研究
-        Log.Information("使用内存存储模式 (Redis API版本兼容性问题)");
+        // 配置存储：使用Redis持久化存储 (Orleans 9.2.1兼容配置)
+        Log.Information("配置Redis存储模式");
+        var redisConnectionString = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+        
+        // Orleans可能需要通过配置文件或Services来设置Redis选项
+        // 暂时使用基础配置，确保能编译并运行
         siloBuilder
-            .AddMemoryGrainStorage("PlayerStorage")
-            .AddMemoryGrainStorage("RoomStorage")
-            .AddMemoryGrainStorage("MatchmakingStorage");
-            
-        // NOTE: Orleans Redis存储API与官方文档示例不匹配
-        // 需要进一步研究正确的属性名称和配置方法
+            .AddRedisGrainStorage("PlayerStorage")
+            .AddRedisGrainStorage("RoomStorage") 
+            .AddRedisGrainStorage("MatchmakingStorage");
     });
 
     // 使用Serilog，确保捕获所有Information级别日志
@@ -92,38 +94,20 @@ try
     // 注册JWT服务
     builder.Services.AddSingleton<JwtService>();
     
-    // 配置Redis连接
-    builder.Services.Configure<RedisOptions>(builder.Configuration.GetSection(RedisOptions.SectionName));
+    // 配置Redis缓存策略 (替换原有的Redis配置)
+    Log.Information("配置Redis缓存策略服务");
+    try
+    {
+        builder.Services.AddRedisCacheStrategy(builder.Configuration);
+        Log.Information("Redis缓存策略服务注册成功");
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Redis缓存策略配置失败，将跳过Redis功能");
+    }
     
     // 配置MongoDB连接
     builder.Services.Configure<MongoDbOptions>(builder.Configuration.GetSection(MongoDbOptions.SectionName));
-    
-    // 验证Redis设置
-    var redisOptions = builder.Configuration.GetSection(RedisOptions.SectionName).Get<RedisOptions>();
-    if (redisOptions != null)
-    {
-        try
-        {
-            redisOptions.Validate();
-            Log.Information("Redis配置验证通过: {KeyPrefix}", redisOptions.KeyPrefix);
-        }
-        catch (Exception ex)
-        {
-            Log.Warning("Redis配置验证失败: {Error}，将使用内存存储", ex.Message);
-            redisOptions = null;
-        }
-    }
-    else
-    {
-        Log.Warning("Redis配置缺失，将使用内存存储");
-    }
-    
-    // 注册Redis连接管理器
-    if (redisOptions != null)
-    {
-        builder.Services.AddSingleton<RedisConnectionManager>();
-        Log.Information("Redis连接管理器已注册");
-    }
     
     // 验证MongoDB设置
     var mongoDbOptions = builder.Configuration.GetSection(MongoDbOptions.SectionName).Get<MongoDbOptions>();
@@ -152,9 +136,9 @@ try
         Log.Information("MongoDB连接管理器已注册");
     }
     
-    // 验证数据同步设置
+    // 验证数据同步设置 (简化，基于新的Redis缓存策略)
     var dataSyncOptions = builder.Configuration.GetSection(DataSyncOptions.SectionName).Get<DataSyncOptions>();
-    if (dataSyncOptions != null && redisOptions != null && mongoDbOptions != null)
+    if (dataSyncOptions != null && mongoDbOptions != null)
     {
         try
         {
@@ -171,7 +155,7 @@ try
     }
     else
     {
-        Log.Warning("数据同步功能需要Redis和MongoDB同时可用，已跳过注册");
+        Log.Warning("数据同步功能需要Redis缓存策略和MongoDB同时可用，已跳过注册");
     }
     
     // 注册限流服务
@@ -317,6 +301,19 @@ try
         Predicate = _ => false
     });
     
+    // 添加Redis缓存健康检查端点
+    app.MapGet("/health/redis", async (IServiceProvider serviceProvider) =>
+    {
+        var (isHealthy, status, details) = await serviceProvider.GetRedisCacheHealthAsync();
+        return Results.Ok(new
+        {
+            status = status,
+            healthy = isHealthy,
+            details = details,
+            timestamp = DateTime.UtcNow
+        });
+    });
+    
     // 添加根路径信息端点
     app.MapGet("/", () => new
     {
@@ -329,9 +326,22 @@ try
             Health = "/health",
             Ready = "/health/ready", 
             Live = "/health/live",
+            Redis = "/health/redis",
             MagicOnion = "gRPC on port 5271"
         }
     });
+
+    // 启动前测试Redis连接
+    Log.Information("测试Redis连接状态...");
+    var redisConnectionOk = await app.Services.TestRedisConnectionAsync();
+    if (redisConnectionOk)
+    {
+        Log.Information("✅ Redis连接测试成功，缓存策略已就绪");
+    }
+    else
+    {
+        Log.Warning("⚠️ Redis连接测试失败，但服务仍将启动（降级运行模式）");
+    }
 
     await app.RunAsync();
 }

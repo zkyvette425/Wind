@@ -180,15 +180,15 @@ namespace Wind.Server.Middleware
             context.Response.ContentType = "application/json";
 
             // 添加标准限流响应头
-            context.Response.Headers.Add("X-RateLimit-Limit", result.MaxRequests.ToString());
-            context.Response.Headers.Add("X-RateLimit-Remaining", "0");
-            context.Response.Headers.Add("X-RateLimit-Reset", 
-                ((DateTimeOffset)result.WindowResetTime).ToUnixTimeSeconds().ToString());
+            context.Response.Headers["X-RateLimit-Limit"] = result.MaxRequests.ToString();
+            context.Response.Headers["X-RateLimit-Remaining"] = "0";
+            context.Response.Headers["X-RateLimit-Reset"] = 
+                ((DateTimeOffset)result.WindowResetTime).ToUnixTimeSeconds().ToString();
             
             if (result.RetryAfter > TimeSpan.Zero)
             {
-                context.Response.Headers.Add("Retry-After", 
-                    ((int)result.RetryAfter.TotalSeconds).ToString());
+                context.Response.Headers["Retry-After"] = 
+                    ((int)result.RetryAfter.TotalSeconds).ToString();
             }
 
             // 创建错误响应
@@ -232,10 +232,10 @@ namespace Wind.Server.Middleware
 
             try
             {
-                context.Response.Headers.Add("X-RateLimit-Limit", result.MaxRequests.ToString());
-                context.Response.Headers.Add("X-RateLimit-Remaining", result.RemainingRequests.ToString());
-                context.Response.Headers.Add("X-RateLimit-Reset", 
-                    ((DateTimeOffset)result.WindowResetTime).ToUnixTimeSeconds().ToString());
+                context.Response.Headers["X-RateLimit-Limit"] = result.MaxRequests.ToString();
+                context.Response.Headers["X-RateLimit-Remaining"] = result.RemainingRequests.ToString();
+                context.Response.Headers["X-RateLimit-Reset"] = 
+                    ((DateTimeOffset)result.WindowResetTime).ToUnixTimeSeconds().ToString();
             }
             catch (Exception ex)
             {

@@ -3,6 +3,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Serialization;
+using Orleans.Configuration;
+using Microsoft.Extensions.Options;
 using Serilog;
 using MagicOnion;
 using MagicOnion.Server;
@@ -14,6 +16,7 @@ using System.Security.Claims;
 using Wind.Shared.Auth;
 using Wind.Server.Services;
 using Wind.Server.Middleware;
+using Wind.Server.Configuration;
 
 // 从配置文件读取Serilog配置
 var configuration = new ConfigurationBuilder()
@@ -50,11 +53,17 @@ try
             .ConfigureEndpoints(
                 advertisedIP: IPAddress.Loopback,
                 siloPort: 11111, 
-                gatewayPort: 30000)
-            // 配置内存持久化存储 (临时方案，后续升级到Redis)
+                gatewayPort: 30000);
+            
+        // 配置存储：临时使用内存存储，Redis API需要进一步研究
+        Log.Information("使用内存存储模式 (Redis API版本兼容性问题)");
+        siloBuilder
             .AddMemoryGrainStorage("PlayerStorage")
             .AddMemoryGrainStorage("RoomStorage")
             .AddMemoryGrainStorage("MatchmakingStorage");
+            
+        // NOTE: Orleans Redis存储API与官方文档示例不匹配
+        // 需要进一步研究正确的属性名称和配置方法
     });
 
     // 使用Serilog，确保捕获所有Information级别日志
@@ -82,6 +91,88 @@ try
 
     // 注册JWT服务
     builder.Services.AddSingleton<JwtService>();
+    
+    // 配置Redis连接
+    builder.Services.Configure<RedisOptions>(builder.Configuration.GetSection(RedisOptions.SectionName));
+    
+    // 配置MongoDB连接
+    builder.Services.Configure<MongoDbOptions>(builder.Configuration.GetSection(MongoDbOptions.SectionName));
+    
+    // 验证Redis设置
+    var redisOptions = builder.Configuration.GetSection(RedisOptions.SectionName).Get<RedisOptions>();
+    if (redisOptions != null)
+    {
+        try
+        {
+            redisOptions.Validate();
+            Log.Information("Redis配置验证通过: {KeyPrefix}", redisOptions.KeyPrefix);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Redis配置验证失败: {Error}，将使用内存存储", ex.Message);
+            redisOptions = null;
+        }
+    }
+    else
+    {
+        Log.Warning("Redis配置缺失，将使用内存存储");
+    }
+    
+    // 注册Redis连接管理器
+    if (redisOptions != null)
+    {
+        builder.Services.AddSingleton<RedisConnectionManager>();
+        Log.Information("Redis连接管理器已注册");
+    }
+    
+    // 验证MongoDB设置
+    var mongoDbOptions = builder.Configuration.GetSection(MongoDbOptions.SectionName).Get<MongoDbOptions>();
+    if (mongoDbOptions != null)
+    {
+        try
+        {
+            mongoDbOptions.Validate();
+            Log.Information("MongoDB配置验证通过: {DatabaseName}", mongoDbOptions.DatabaseName);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("MongoDB配置验证失败: {Error}，将跳过MongoDB集成", ex.Message);
+            mongoDbOptions = null;
+        }
+    }
+    else
+    {
+        Log.Warning("MongoDB配置缺失，将跳过MongoDB集成");
+    }
+    
+    // 注册MongoDB连接管理器
+    if (mongoDbOptions != null)
+    {
+        builder.Services.AddSingleton<MongoDbConnectionManager>();
+        Log.Information("MongoDB连接管理器已注册");
+    }
+    
+    // 验证数据同步设置
+    var dataSyncOptions = builder.Configuration.GetSection(DataSyncOptions.SectionName).Get<DataSyncOptions>();
+    if (dataSyncOptions != null && redisOptions != null && mongoDbOptions != null)
+    {
+        try
+        {
+            dataSyncOptions.Validate();
+            builder.Services.Configure<DataSyncOptions>(builder.Configuration.GetSection(DataSyncOptions.SectionName));
+            builder.Services.AddSingleton<IDataSyncService, DataSyncService>();
+            builder.Services.AddSingleton<DataSyncManager>();
+            Log.Information("数据同步服务已注册: 默认策略={DefaultStrategy}", dataSyncOptions.SyncStrategy.DefaultStrategy);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("数据同步配置验证失败: {Error}，将跳过数据同步功能", ex.Message);
+        }
+    }
+    else
+    {
+        Log.Warning("数据同步功能需要Redis和MongoDB同时可用，已跳过注册");
+    }
     
     // 注册限流服务
     builder.Services.AddRateLimit(options =>

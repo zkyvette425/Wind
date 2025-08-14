@@ -40,7 +40,7 @@ namespace Wind.Grains
             await base.OnActivateAsync(cancellationToken);
         }
 
-        public async Task<PlayerLoginResponse> LoginAsync(PlayerLoginRequest request)
+        public Task<PlayerLoginResponse> LoginAsync(PlayerLoginRequest request)
         {
             try
             {
@@ -75,23 +75,23 @@ namespace Wind.Grains
                 _logger.LogInformation("玩家登录成功: {PlayerId}, SessionId: {SessionId}", 
                     request.PlayerId, sessionId);
 
-                return new PlayerLoginResponse
+                return Task.FromResult(new PlayerLoginResponse
                 {
                     Success = true,
                     Message = "登录成功",
                     SessionId = sessionId,
                     AuthToken = GenerateAuthToken(request.PlayerId, sessionId),
                     PlayerInfo = playerInfo
-                };
+                });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "玩家登录失败: {PlayerId}", request.PlayerId);
-                return new PlayerLoginResponse
+                return Task.FromResult(new PlayerLoginResponse
                 {
                     Success = false,
                     Message = $"登录失败: {ex.Message}"
-                };
+                });
             }
         }
 
@@ -453,7 +453,8 @@ namespace Wind.Grains
                 OnlineStatus = state.OnlineStatus,
                 LastLoginAt = state.LastLoginAt,
                 Stats = state.Stats,
-                Position = state.Position
+                Position = state.Position,
+                CurrentRoomId = state.CurrentRoomId
             };
         }
 

@@ -65,17 +65,21 @@ namespace Wind.Grains
             }
 
             // 启动定时器
-            _cleanupTimer = RegisterTimer(
-                CleanupExpiredMessagesTimerCallback,
-                null,
-                TimeSpan.FromMilliseconds(_config.CleanupIntervalMs),
-                TimeSpan.FromMilliseconds(_config.CleanupIntervalMs));
+            _cleanupTimer = this.RegisterGrainTimer(
+                async _ => await CleanupExpiredMessagesTimerCallback(null),
+                new() { 
+                    DueTime = TimeSpan.FromMilliseconds(_config.CleanupIntervalMs), 
+                    Period = TimeSpan.FromMilliseconds(_config.CleanupIntervalMs), 
+                    Interleave = true 
+                });
 
-            _deliveryTimer = RegisterTimer(
-                ProcessMessageQueuesTimerCallback,
-                null,
-                TimeSpan.FromMilliseconds(100), // 快速处理
-                TimeSpan.FromMilliseconds(100));
+            _deliveryTimer = this.RegisterGrainTimer(
+                async _ => await ProcessMessageQueuesTimerCallback(null),
+                new() { 
+                    DueTime = TimeSpan.FromMilliseconds(100), // 快速处理
+                    Period = TimeSpan.FromMilliseconds(100), 
+                    Interleave = true 
+                });
 
             _logger.LogInformation("消息路由器 {GrainId} 已激活，配置: {Config}", 
                 this.GetPrimaryKeyString(), _config);
@@ -837,7 +841,7 @@ namespace Wind.Grains
 
         // ======== 定时器回调 ========
 
-        private async Task CleanupExpiredMessagesTimerCallback(object state)
+        private async Task CleanupExpiredMessagesTimerCallback(object? state)
         {
             try
             {
@@ -849,7 +853,7 @@ namespace Wind.Grains
             }
         }
 
-        private async Task ProcessMessageQueuesTimerCallback(object state)
+        private async Task ProcessMessageQueuesTimerCallback(object? state)
         {
             try
             {

@@ -79,6 +79,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 📋 技术研究记录 (`plans/技术研究记录.md`) - 查阅相关技术调研
 - 📋 决策记录 (`plans/决策记录.md`) - 记录重要决策
 
+#### 创建新工具或文档时必须检查：
+- 📁 文档组织规范 - 使用标准目录结构
+- 📄 文档模板 (`docs/templates/`) - 确保格式一致性
+- 🔄 版本管理机制 - 建立文档与代码的关联
+
 ### 📋 TODO列表工作模式 ⚡ 严格执行！
 - **双重完成标准**: 每个任务必须标记 ✅ 已完成 + 🧪 已测试
 - **逐个任务标记**: 完成一个任务立即标记，不能批量处理
@@ -236,6 +241,44 @@ dotnet test --collect:"XPlat Code Coverage"
 - 📊 记录具体数据（代码行数、文件数、测试结果）
 
 **⚠️ 严重警告：用户已为此规范提醒4次，再次遗忘将导致严重后果！⚠️**
+
+### 🗂️ 文档组织规范 (新增 - 2025-08-15)
+
+#### 标准目录结构
+```
+docs/
+├── development/        # 开发环境和工具文档
+│   ├── redis-testing.md      # Redis测试环境
+│   └── [tool-name].md        # 其他开发工具
+├── templates/          # 文档模板库
+│   ├── development-tool-template.md  # 详细文档模板
+│   └── tool-package-template.md      # 工具包README模板
+└── orleans/            # Orleans技术文档
+
+tools/
+├── redis-testing/      # Redis测试工具包
+│   ├── start.bat
+│   ├── run-tests.bat
+│   ├── stop.bat
+│   ├── docker-compose.test.yml
+│   └── README.md
+├── common/             # 通用工具
+│   ├── check-doc-updates.bat
+│   └── README.md
+└── [tool-name]/        # 其他工具包
+```
+
+#### 文档版本管理要求
+- **版本头部**: 每个文档必须包含版本信息、创建时间、关联配置
+- **变更历史**: 维护详细的版本变更记录表格
+- **关联标记**: 明确标记与哪些代码文件相关联
+- **更新检查**: 配置变更时主动检查文档是否需要更新
+
+#### 新工具创建规范
+1. **使用模板**: 必须基于 `docs/templates/` 中的标准模板
+2. **目录规划**: 按功能分类放入适当的 `tools/[category]/` 目录  
+3. **文档完整**: 同时创建详细文档(docs/)和简要说明(tools/README.md)
+4. **版本管理**: 建立文档与配置文件的关联检查机制
 
 ### 学习和文档
 - 📚 **强制要求**: 使用任何新技术前先通过Context7查阅最新文档

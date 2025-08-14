@@ -1,0 +1,59 @@
+# Redis测试环境Docker配置
+# 为Wind游戏服务器测试提供Redis容器支持
+
+services:
+  redis-test:
+    image: redis:7.2-alpine
+    container_name: wind-redis-test
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server 
+      --requirepass windgame123
+      --databases 16
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save ""
+      --appendonly no
+    volumes:
+      - redis-test-data:/data
+    environment:
+      - REDIS_PASSWORD=windgame123
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "windgame123", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - wind-test-network
+
+  # Redis管理界面（可选，便于调试）
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: wind-redis-commander
+    environment:
+      - REDIS_HOSTS=redis-test:redis-test:6379:0:windgame123
+    ports:
+      - "8081:8081"
+    depends_on:
+      redis-test:
+        condition: service_healthy
+    networks:
+      - wind-test-network
+    profiles:
+      - debug
+
+# 数据卷定义
+volumes:
+  redis-test-data:
+    name: wind-redis-test-data
+  redis-test-logs:
+    name: wind-redis-test-logs
+
+# 网络定义
+networks:
+  wind-test-network:
+    name: wind-test-network
+    driver: bridge

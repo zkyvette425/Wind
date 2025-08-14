@@ -3,7 +3,9 @@ using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Orleans.TestingHost;
+using StackExchange.Redis;
 using Wind.GrainInterfaces;
 using Wind.Grains;
 using Wind.Shared.Models;
@@ -17,6 +19,8 @@ namespace Wind.Tests.RedisStorageTests;
 /// Redis存储验证测试
 /// 验证Orleans确实使用Redis存储而非内存存储
 /// </summary>
+[Trait("Category", "Integration")]
+[Trait("RequiresRedis", "true")]
 public class RedisStorageValidationTests : IClassFixture<RedisStorageValidationTests.Fixture>
 {
     private readonly Fixture _fixture;
@@ -141,6 +145,11 @@ public class RedisStorageValidationTests : IClassFixture<RedisStorageValidationT
 
         public Fixture()
         {
+            // 初始化测试用的简单Serilog配置
+            Serilog.Log.Logger = new Serilog.LoggerConfiguration()
+                .MinimumLevel.Warning()
+                .CreateLogger();
+            
             var builder = new TestClusterBuilder();
             
             // 配置测试集群使用Redis存储 (与主程序相同的配置)
@@ -161,11 +170,42 @@ public class RedisStorageValidationTests : IClassFixture<RedisStorageValidationT
     {
         public void Configure(ISiloBuilder siloBuilder)
         {
-            // 配置与主程序相同的Redis存储
+            // 配置与主程序相同的Redis存储 (正确的Orleans 9.2.1 API)
             siloBuilder
-                .AddRedisGrainStorage("PlayerStorage")
-                .AddRedisGrainStorage("RoomStorage")
-                .AddRedisGrainStorage("MatchmakingStorage");
+                .AddRedisGrainStorage(
+                    name: "PlayerStorage",
+                    options =>
+                    {
+                        options.ConfigurationOptions = ConfigurationOptions.Parse("localhost:6379,password=windgame123");
+                        options.GetStorageKey = (type, id) => $"player:{type}-{id}";
+                    })
+                .AddRedisGrainStorage(
+                    name: "RoomStorage",
+                    options =>
+                    {
+                        var redisConfig = ConfigurationOptions.Parse("localhost:6379,password=windgame123");
+                        redisConfig.DefaultDatabase = 1;
+                        options.ConfigurationOptions = redisConfig;
+                        options.GetStorageKey = (type, id) => $"room:{type}-{id}";
+                    })
+                .AddRedisGrainStorage(
+                    name: "MatchmakingStorage",
+                    options =>
+                    {
+                        var redisConfig = ConfigurationOptions.Parse("localhost:6379,password=windgame123");
+                        redisConfig.DefaultDatabase = 2;
+                        options.ConfigurationOptions = redisConfig;
+                        options.GetStorageKey = (type, id) => $"match:{type}-{id}";
+                    });
+                
+            // 配置测试日志
+            siloBuilder.ConfigureServices(services =>
+            {
+                // 配置Orleans MessagePack序列化器
+                services.AddSerializer(serializerBuilder => serializerBuilder.AddMessagePackSerializer());
+                
+                services.AddSingleton<Serilog.ILogger>(Serilog.Log.Logger);
+            });
         }
     }
 }

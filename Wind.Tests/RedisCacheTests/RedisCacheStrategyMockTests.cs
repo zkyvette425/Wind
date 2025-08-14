@@ -12,6 +12,8 @@ namespace Wind.Tests.RedisCacheTests;
 /// Redis缓存策略Mock测试
 /// 用于验证缓存策略逻辑，无需实际Redis连接
 /// </summary>
+[Trait("Category", "Unit")]
+[Trait("RequiresRedis", "false")]
 public class RedisCacheStrategyMockTests
 {
     private readonly ITestOutputHelper _output;

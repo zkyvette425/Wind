@@ -44,6 +44,25 @@ namespace Wind.Server.Services
         {
             try
             {
+                // 空值检查
+                if (string.IsNullOrEmpty(clientIdentifier))
+                {
+                    _logger.LogWarning("客户端标识符为空或null");
+                    return CreateErrorResult("客户端标识符无效");
+                }
+                
+                if (string.IsNullOrEmpty(endpoint))
+                {
+                    _logger.LogWarning("端点为空或null");
+                    return CreateErrorResult("端点无效");
+                }
+                
+                if (policy == null)
+                {
+                    _logger.LogWarning("限流策略为null");
+                    return CreateErrorResult("限流策略无效");
+                }
+
                 var now = DateTime.UtcNow;
                 
                 // 1. 检查客户端级别限流
@@ -256,6 +275,23 @@ namespace Wind.Server.Services
             {
                 _logger.LogError(ex, "清理过期限流窗口时发生错误");
             }
+        }
+
+        private RateLimitCheckResult CreateErrorResult(string errorMessage)
+        {
+            // Fail-safe模式：遇到错误时允许请求通过，避免系统不可用
+            return new RateLimitCheckResult
+            {
+                IsAllowed = true,
+                ClientIdentifier = "unknown",
+                Endpoint = "unknown", 
+                RemainingRequests = 1000, // 给一个合理的剩余请求数
+                WindowResetTime = DateTime.UtcNow.AddMinutes(1),
+                LimitType = "error",
+                CurrentRequests = 0,
+                MaxRequests = 1000,
+                RetryAfter = TimeSpan.Zero
+            };
         }
 
         public void Dispose()

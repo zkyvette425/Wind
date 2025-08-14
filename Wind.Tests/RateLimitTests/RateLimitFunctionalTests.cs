@@ -173,7 +173,8 @@ namespace Wind.Tests.RateLimitTests
                 options.DefaultPolicy = new RateLimitPolicy
                 {
                     WindowSize = TimeSpan.FromSeconds(10),
-                    MaxRequests = 5
+                    MaxRequests = 5,
+                    GlobalMaxRequests = 20 // 添加全局限制以便测试统计信息
                 };
                 options.EnableRateLimit = true;
             });

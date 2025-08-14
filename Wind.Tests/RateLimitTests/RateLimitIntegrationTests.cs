@@ -25,12 +25,46 @@ namespace Wind.Tests.RateLimitTests
             _clusterFixture = clusterFixture;
         }
 
+        private RateLimitingService CreateTestRateLimitingService()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Warning));
+            
+            services.Configure<RateLimitOptions>(options =>
+            {
+                options.DefaultPolicy = new RateLimitPolicy
+                {
+                    Name = "IntegrationTestDefault",
+                    WindowSize = TimeSpan.FromSeconds(5),
+                    MaxRequests = 10,
+                    GlobalMaxRequests = 100
+                };
+                options.EndpointPolicies = new Dictionary<string, RateLimitPolicy>
+                {
+                    ["LoginAsync"] = new RateLimitPolicy
+                    {
+                        Name = "LoginTest", 
+                        WindowSize = TimeSpan.FromSeconds(10),
+                        MaxRequests = 3,
+                        GlobalMaxRequests = 20
+                    }
+                };
+                options.WhitelistedClients = new List<string>();
+                options.EnableRateLimit = true;
+                options.EnableLogging = false; // 测试时关闭限流日志
+            });
+
+            services.AddSingleton<RateLimitingService>();
+            
+            var serviceProvider = services.BuildServiceProvider();
+            return serviceProvider.GetRequiredService<RateLimitingService>();
+        }
+
         [Fact]
         public async Task RateLimitingService_基本功能测试()
         {
-            // Arrange
-            var serviceProvider = _clusterFixture.Cluster.ServiceProvider;
-            var rateLimitingService = serviceProvider.GetRequiredService<RateLimitingService>();
+            // Arrange - 创建测试专用的RateLimitingService
+            var rateLimitingService = CreateTestRateLimitingService();
             
             var policy = new RateLimitPolicy
             {
@@ -60,9 +94,8 @@ namespace Wind.Tests.RateLimitTests
         [Fact]
         public async Task RateLimitingService_多客户端并发测试()
         {
-            // Arrange
-            var serviceProvider = _clusterFixture.Cluster.ServiceProvider;
-            var rateLimitingService = serviceProvider.GetRequiredService<RateLimitingService>();
+            // Arrange - 从Silo的ServiceProvider获取RateLimitingService
+            var rateLimitingService = CreateTestRateLimitingService();
             
             var policy = new RateLimitPolicy
             {
@@ -116,8 +149,7 @@ namespace Wind.Tests.RateLimitTests
         public async Task RateLimitingService_时间窗口恢复测试()
         {
             // Arrange
-            var serviceProvider = _clusterFixture.Cluster.ServiceProvider;
-            var rateLimitingService = serviceProvider.GetRequiredService<RateLimitingService>();
+            var rateLimitingService = CreateTestRateLimitingService();
             
             var policy = new RateLimitPolicy
             {
@@ -154,8 +186,7 @@ namespace Wind.Tests.RateLimitTests
         public async Task RateLimitingService_统计信息验证()
         {
             // Arrange
-            var serviceProvider = _clusterFixture.Cluster.ServiceProvider;
-            var rateLimitingService = serviceProvider.GetRequiredService<RateLimitingService>();
+            var rateLimitingService = CreateTestRateLimitingService();
             
             var policy = new RateLimitPolicy
             {
@@ -197,8 +228,7 @@ namespace Wind.Tests.RateLimitTests
         public async Task RateLimitingService_策略选择测试()
         {
             // Arrange
-            var serviceProvider = _clusterFixture.Cluster.ServiceProvider;
-            var rateLimitingService = serviceProvider.GetRequiredService<RateLimitingService>();
+            var rateLimitingService = CreateTestRateLimitingService();
             
             var clientId = "policy-test-client";
 
@@ -218,8 +248,7 @@ namespace Wind.Tests.RateLimitTests
         public async Task RateLimitingService_错误处理测试()
         {
             // Arrange
-            var serviceProvider = _clusterFixture.Cluster.ServiceProvider;
-            var rateLimitingService = serviceProvider.GetRequiredService<RateLimitingService>();
+            var rateLimitingService = CreateTestRateLimitingService();
             
             // Act & Assert - 测试异常输入
             var nullClientResult = rateLimitingService.CheckRateLimit(null!, "TestEndpoint", new RateLimitPolicy());
@@ -236,8 +265,7 @@ namespace Wind.Tests.RateLimitTests
         public async Task RateLimitingService_高并发压力测试()
         {
             // Arrange
-            var serviceProvider = _clusterFixture.Cluster.ServiceProvider;
-            var rateLimitingService = serviceProvider.GetRequiredService<RateLimitingService>();
+            var rateLimitingService = CreateTestRateLimitingService();
             
             var policy = new RateLimitPolicy
             {

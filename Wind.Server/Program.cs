@@ -4,8 +4,10 @@ using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Serialization;
 using Orleans.Configuration;
+using Orleans.Persistence;
 using Microsoft.Extensions.Options;
 using Serilog;
+using StackExchange.Redis;
 using MagicOnion;
 using MagicOnion.Server;
 using MessagePack;
@@ -58,14 +60,54 @@ try
             
         // 配置存储：使用Redis持久化存储 (Orleans 9.2.1兼容配置)
         Log.Information("配置Redis存储模式");
-        var redisConnectionString = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379";
+        var redisConnectionString = builder.Configuration.GetConnectionString("Redis") ?? "localhost:6379,password=windgame123";
         
-        // Orleans可能需要通过配置文件或Services来设置Redis选项
-        // 暂时使用基础配置，确保能编译并运行
-        siloBuilder
-            .AddRedisGrainStorage("PlayerStorage")
-            .AddRedisGrainStorage("RoomStorage") 
-            .AddRedisGrainStorage("MatchmakingStorage");
+        // 先添加基本的内存存储作为默认存储（避免启动错误）
+        siloBuilder.AddMemoryGrainStorage("Default");
+        
+        // 配置Orleans Redis存储（正确位置：在SiloBuilder中）
+        Log.Information("在SiloBuilder中配置Redis存储，连接字符串: {ConnectionString}", redisConnectionString.Replace("password=windgame123", "password=***"));
+        try
+        {
+            // 创建Redis配置选项
+            var redisConfigOptions = ConfigurationOptions.Parse(redisConnectionString);
+            redisConfigOptions.AbortOnConnectFail = false; // 避免连接失败时崩溃
+            
+            siloBuilder
+                .AddRedisGrainStorage("PlayerStorage", options => {
+                    options.ConfigurationOptions = redisConfigOptions;
+                    // 使用不同的数据库通过连接字符串配置
+                    var playerConfigOptions = ConfigurationOptions.Parse(redisConnectionString);
+                    playerConfigOptions.DefaultDatabase = 0;
+                    playerConfigOptions.AbortOnConnectFail = false;
+                    options.ConfigurationOptions = playerConfigOptions;
+                    Log.Information("PlayerStorage Redis配置完成: DB=0");
+                })
+                .AddRedisGrainStorage("RoomStorage", options => {
+                    var roomConfigOptions = ConfigurationOptions.Parse(redisConnectionString);
+                    roomConfigOptions.DefaultDatabase = 1;
+                    roomConfigOptions.AbortOnConnectFail = false;
+                    options.ConfigurationOptions = roomConfigOptions;
+                    Log.Information("RoomStorage Redis配置完成: DB=1");
+                })
+                .AddRedisGrainStorage("MatchmakingStorage", options => {
+                    var matchmakingConfigOptions = ConfigurationOptions.Parse(redisConnectionString);
+                    matchmakingConfigOptions.DefaultDatabase = 2;
+                    matchmakingConfigOptions.AbortOnConnectFail = false;
+                    options.ConfigurationOptions = matchmakingConfigOptions;
+                    Log.Information("MatchmakingStorage Redis配置完成: DB=2");
+                });
+            Log.Information("✅ Orleans Redis存储配置成功");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Orleans Redis存储配置失败，将使用内存存储");
+            // 如果Redis配置失败，回退到内存存储
+            siloBuilder
+                .AddMemoryGrainStorage("PlayerStorage")
+                .AddMemoryGrainStorage("RoomStorage") 
+                .AddMemoryGrainStorage("MatchmakingStorage");
+        }
     });
 
     // 使用Serilog，确保捕获所有Information级别日志
@@ -105,6 +147,9 @@ try
     {
         Log.Warning(ex, "Redis缓存策略配置失败，将跳过Redis功能");
     }
+    
+    // Orleans Redis存储配置已移动到SiloBuilder中（见下方UseOrleans配置）
+    Log.Information("Orleans Redis Grain存储将在SiloBuilder中配置");
     
     // 配置MongoDB连接
     builder.Services.Configure<MongoDbOptions>(builder.Configuration.GetSection(MongoDbOptions.SectionName));
@@ -274,7 +319,7 @@ try
         .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy());
 
     Log.Information("Orleans Silo配置完成，端口: Silo=11111, Gateway=30000");
-    Log.Information("Orleans存储配置: PlayerStorage, RoomStorage, MatchmakingStorage (Memory)");
+    Log.Information("Orleans存储配置: PlayerStorage(DB:0), RoomStorage(DB:1), MatchmakingStorage(DB:2) -> Redis");
     Log.Information("MagicOnion服务已添加到DI容器，将自动发现PlayerService等服务");
     Log.Information("健康检查服务已配置");
 

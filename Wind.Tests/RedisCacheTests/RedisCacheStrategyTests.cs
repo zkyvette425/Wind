@@ -314,8 +314,8 @@ public class RedisCacheStrategyTests : IClassFixture<RedisCacheStrategyTests.Fix
                 // 配置Orleans MessagePack序列化器
                 services.AddSerializer(serializerBuilder => serializerBuilder.AddMessagePackSerializer());
                 
-                // 配置测试日志
-                services.AddSingleton<Serilog.ILogger>(Serilog.Log.Logger);
+                // 配置测试日志 - 使用Microsoft.Extensions.Logging
+                services.AddLogging();
                 
                 // 直接注册Redis连接和服务
                 services.AddSingleton<IConnectionMultiplexer>(provider =>

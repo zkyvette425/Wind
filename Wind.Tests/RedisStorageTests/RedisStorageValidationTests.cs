@@ -204,7 +204,8 @@ public class RedisStorageValidationTests : IClassFixture<RedisStorageValidationT
                 // 配置Orleans MessagePack序列化器
                 services.AddSerializer(serializerBuilder => serializerBuilder.AddMessagePackSerializer());
                 
-                services.AddSingleton<Serilog.ILogger>(Serilog.Log.Logger);
+                // 使用Microsoft.Extensions.Logging代替Serilog
+                services.AddLogging();
             });
         }
     }

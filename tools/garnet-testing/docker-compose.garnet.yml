@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  garnet-test:
+    image: ghcr.io/microsoft/garnet:latest
+    container_name: wind-garnet-test
+    ports:
+      - "6380:6379"  # Garnet on different port to avoid Redis conflict
+    command: [
+      "--bind", "0.0.0.0",
+      "--port", "6379",
+      "--checkpointdir", "/data/checkpoints",
+      "--recover",
+      "--lua",
+      "--auth", "windgame123"
+    ]
+    volumes:
+      - garnet_data:/data
+    networks:
+      - wind-test-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c 'cat < /dev/null > /dev/tcp/localhost/6379'"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  redis-test:
+    image: redis:7.2-alpine
+    container_name: wind-redis-test
+    ports:
+      - "6379:6379"  # Redis on standard port
+    command: [
+      "redis-server",
+      "--requirepass", "windgame123",
+      "--appendonly", "yes",
+      "--appendfsync", "everysec"
+    ]
+    volumes:
+      - redis_data:/data
+    networks:
+      - wind-test-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  garnet_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  wind-test-network:
+    driver: bridge

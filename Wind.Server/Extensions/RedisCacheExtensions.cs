@@ -3,7 +3,7 @@ using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using Wind.Server.Configuration;
 using Wind.Server.Services;
-using Serilog;
+using Microsoft.Extensions.Logging;
 
 namespace Wind.Server.Extensions;
 
@@ -25,7 +25,8 @@ public static class RedisCacheExtensions
         services.AddSingleton<IConnectionMultiplexer>(serviceProvider =>
         {
             var redisOptions = serviceProvider.GetRequiredService<IOptions<RedisOptions>>().Value;
-            var logger = serviceProvider.GetRequiredService<Serilog.ILogger>();
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+            var logger = loggerFactory.CreateLogger("Redis.Connection");
             
             try
             {
@@ -49,7 +50,7 @@ public static class RedisCacheExtensions
                 configuration.AbortOnConnectFail = false; // 避免启动时因Redis连接失败而崩溃
                 configuration.ChannelPrefix = RedisChannel.Literal(redisOptions.KeyPrefix ?? "Wind:v1.2:");
                 
-                logger.Information("Redis连接配置: {ConnectionString}, SSL={SSL}, 重试={RetryCount}", 
+                logger.LogInformation("Redis连接配置: {ConnectionString}, SSL={SSL}, 重试={RetryCount}", 
                     MaskConnectionString(redisOptions.ConnectionString), redisOptions.EnableSsl, redisOptions.RetryCount);
                 
                 var multiplexer = ConnectionMultiplexer.Connect(configuration);
@@ -57,27 +58,27 @@ public static class RedisCacheExtensions
                 // 注册连接事件监听
                 multiplexer.ConnectionFailed += (sender, args) =>
                 {
-                    logger.Error("Redis连接失败: {EndPoint}, {FailureType}", args.EndPoint, args.FailureType);
+                    logger.LogError("Redis连接失败: {EndPoint}, {FailureType}", args.EndPoint, args.FailureType);
                 };
                 
                 multiplexer.ConnectionRestored += (sender, args) =>
                 {
-                    logger.Information("Redis连接恢复: {EndPoint}", args.EndPoint);
+                    logger.LogInformation("Redis连接恢复: {EndPoint}", args.EndPoint);
                 };
                 
                 multiplexer.ErrorMessage += (sender, args) =>
                 {
-                    logger.Warning("Redis错误消息: {Message} from {EndPoint}", args.Message, args.EndPoint);
+                    logger.LogWarning("Redis错误消息: {Message} from {EndPoint}", args.Message, args.EndPoint);
                 };
                 
-                logger.Information("Redis连接建立成功: {EndPoints}", 
+                logger.LogInformation("Redis连接建立成功: {EndPoints}", 
                     string.Join(", ", multiplexer.GetEndPoints().Select(ep => ep.ToString())));
                 
                 return multiplexer;
             }
             catch (Exception ex)
             {
-                logger.Error(ex, "Redis连接初始化失败，将使用内存缓存替代");
+                logger.LogError(ex, "Redis连接初始化失败，将使用内存缓存替代");
                 
                 // 返回一个假的连接，用于测试和开发环境
                 // 在生产环境中应该抛出异常
@@ -143,15 +144,17 @@ public static class RedisCacheExtensions
             // 执行简单的ping测试
             var pingTime = await database.PingAsync();
             
-            var logger = serviceProvider.GetRequiredService<Serilog.ILogger>();
-            logger.Information("Redis连接测试成功: Ping={PingMs}ms", pingTime.TotalMilliseconds);
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+            var logger = loggerFactory.CreateLogger("Redis.TestConnection");
+            logger.LogInformation("Redis连接测试成功: Ping={PingMs}ms", pingTime.TotalMilliseconds);
             
             return true;
         }
         catch (Exception ex)
         {
-            var logger = serviceProvider.GetRequiredService<Serilog.ILogger>();
-            logger.Error(ex, "Redis连接测试失败");
+            var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
+            var logger = loggerFactory.CreateLogger("Redis.TestConnection");
+            logger.LogError(ex, "Redis连接测试失败");
             return false;
         }
     }

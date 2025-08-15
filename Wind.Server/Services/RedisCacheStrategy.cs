@@ -1,7 +1,7 @@
 using StackExchange.Redis;
 using Microsoft.Extensions.Options;
 using Wind.Server.Configuration;
-using Serilog;
+using Microsoft.Extensions.Logging;
 using Wind.Shared.Models;
 using MessagePack;
 
@@ -15,16 +15,16 @@ public class RedisCacheStrategy
 {
     private readonly IDatabase _database;
     private readonly RedisOptions _redisOptions;
-    private readonly Serilog.ILogger _logger;
+    private readonly ILogger<RedisCacheStrategy> _logger;
     
     // 预定义的TTL策略
     private readonly Dictionary<string, TimeSpan> _ttlStrategies;
 
-    public RedisCacheStrategy(IConnectionMultiplexer redis, IOptions<RedisOptions> redisOptions, Serilog.ILogger logger)
+    public RedisCacheStrategy(IConnectionMultiplexer redis, IOptions<RedisOptions> redisOptions, ILogger<RedisCacheStrategy> logger)
     {
         _database = redis.GetDatabase();
         _redisOptions = redisOptions.Value;
-        _logger = logger.ForContext<RedisCacheStrategy>();
+        _logger = logger;
         
         // 初始化TTL策略映射
         _ttlStrategies = new Dictionary<string, TimeSpan>
@@ -73,14 +73,14 @@ public class RedisCacheStrategy
             
             var result = await _database.StringSetAsync(fullKey, serializedValue, ttl);
             
-            _logger.Debug("设置缓存成功: Key={Key}, DataType={DataType}, TTL={TTL}s", 
+            _logger.LogDebug("设置缓存成功: Key={Key}, DataType={DataType}, TTL={TTL}s", 
                 fullKey, dataType, ttl.TotalSeconds);
                 
             return result;
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "设置缓存失败: Key={Key}, DataType={DataType}", key, dataType);
+            _logger.LogError(ex, "设置缓存失败: Key={Key}, DataType={DataType}", key, dataType);
             return false;
         }
     }
@@ -97,7 +97,7 @@ public class RedisCacheStrategy
             
             if (!value.HasValue)
             {
-                _logger.Debug("缓存未命中: Key={Key}", fullKey);
+                _logger.LogDebug("缓存未命中: Key={Key}", fullKey);
                 return default(T);
             }
 
@@ -107,14 +107,14 @@ public class RedisCacheStrategy
             
             var deserializedValue = MessagePackSerializer.Deserialize<T>(value);
             
-            _logger.Debug("缓存命中并刷新TTL: Key={Key}, TTL={TTL}s", 
+            _logger.LogDebug("缓存命中并刷新TTL: Key={Key}, TTL={TTL}s", 
                 fullKey, ttl.TotalSeconds);
                 
             return deserializedValue;
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "获取缓存失败: Key={Key}, DataType={DataType}", key, dataType);
+            _logger.LogError(ex, "获取缓存失败: Key={Key}, DataType={DataType}", key, dataType);
             return default(T);
         }
     }
@@ -144,14 +144,14 @@ public class RedisCacheStrategy
 
             var deserializedValue = MessagePackSerializer.Deserialize<T>(value);
             
-            _logger.Debug("获取缓存和TTL信息: Key={Key}, 剩余TTL={TTL}s", 
+            _logger.LogDebug("获取缓存和TTL信息: Key={Key}, 剩余TTL={TTL}s", 
                 fullKey, remainingTtl?.TotalSeconds ?? -1);
                 
             return (deserializedValue, remainingTtl);
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "获取缓存TTL信息失败: Key={Key}, DataType={DataType}", key, dataType);
+            _logger.LogError(ex, "获取缓存TTL信息失败: Key={Key}, DataType={DataType}", key, dataType);
             return (default(T), null);
         }
     }
@@ -171,18 +171,18 @@ public class RedisCacheStrategy
             
             if (result)
             {
-                _logger.Debug("条件设置缓存成功: Key={Key}, DataType={DataType}", fullKey, dataType);
+                _logger.LogDebug("条件设置缓存成功: Key={Key}, DataType={DataType}", fullKey, dataType);
             }
             else
             {
-                _logger.Debug("条件设置缓存跳过（键已存在）: Key={Key}", fullKey);
+                _logger.LogDebug("条件设置缓存跳过（键已存在）: Key={Key}", fullKey);
             }
                 
             return result;
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "条件设置缓存失败: Key={Key}, DataType={DataType}", key, dataType);
+            _logger.LogError(ex, "条件设置缓存失败: Key={Key}, DataType={DataType}", key, dataType);
             return false;
         }
     }
@@ -200,14 +200,14 @@ public class RedisCacheStrategy
             // 使用GT选项：仅当新过期时间大于当前过期时间时才设置
             var result = await _database.KeyExpireAsync(fullKey, newTtl, ExpireWhen.GreaterThanCurrentExpiry);
             
-            _logger.Debug("延长TTL: Key={Key}, 新TTL={TTL}s, 结果={Result}", 
+            _logger.LogDebug("延长TTL: Key={Key}, 新TTL={TTL}s, 结果={Result}", 
                 fullKey, newTtl.TotalSeconds, result);
                 
             return result;
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "延长TTL失败: Key={Key}, DataType={DataType}", key, dataType);
+            _logger.LogError(ex, "延长TTL失败: Key={Key}, DataType={DataType}", key, dataType);
             return false;
         }
     }
@@ -234,14 +234,14 @@ public class RedisCacheStrategy
             var results = await Task.WhenAll(tasks);
             
             var successCount = results.Count(r => r);
-            _logger.Debug("批量设置缓存完成: 成功={Success}/{Total}, DataType={DataType}", 
+            _logger.LogDebug("批量设置缓存完成: 成功={Success}/{Total}, DataType={DataType}", 
                 successCount, keyValuePairs.Count, dataType);
                 
             return successCount == keyValuePairs.Count;
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "批量设置缓存失败: Count={Count}, DataType={DataType}", 
+            _logger.LogError(ex, "批量设置缓存失败: Count={Count}, DataType={DataType}", 
                 keyValuePairs.Count, dataType);
             return false;
         }
@@ -269,14 +269,14 @@ public class RedisCacheStrategy
                 Timestamp = DateTime.UtcNow
             };
             
-            _logger.Debug("缓存统计: 内存使用={UsedMemory}MB, 总键数={TotalKeys}, 命中率={HitRate}%", 
+            _logger.LogDebug("缓存统计: 内存使用={UsedMemory}MB, 总键数={TotalKeys}, 命中率={HitRate}%", 
                 stats.UsedMemory / 1024 / 1024, stats.TotalKeys, stats.HitRate);
                 
             return stats;
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "获取缓存统计失败");
+            _logger.LogError(ex, "获取缓存统计失败");
             return new CacheStatistics { Timestamp = DateTime.UtcNow };
         }
     }
@@ -308,7 +308,7 @@ public class RedisCacheStrategy
             if (expiredKeys.Count > 0)
             {
                 var deletedCount = await _database.KeyDeleteAsync(expiredKeys.ToArray());
-                _logger.Information("手动清理过期键: 删除={Deleted}个键", deletedCount);
+                _logger.LogInformation("手动清理过期键: 删除={Deleted}个键", deletedCount);
                 return deletedCount;
             }
             
@@ -316,7 +316,7 @@ public class RedisCacheStrategy
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "清理过期键失败");
+            _logger.LogError(ex, "清理过期键失败");
             return 0;
         }
     }

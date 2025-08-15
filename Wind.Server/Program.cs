@@ -65,18 +65,12 @@ try
         // 先添加基本的内存存储作为默认存储（避免启动错误）
         siloBuilder.AddMemoryGrainStorage("Default");
         
-        // 配置Orleans Redis存储（正确位置：在SiloBuilder中）
+        // 配置Orleans Redis存储（基于技术研究记录案例3的正确解决方案）
         Log.Information("在SiloBuilder中配置Redis存储，连接字符串: {ConnectionString}", redisConnectionString.Replace("password=windgame123", "password=***"));
         try
         {
-            // 创建Redis配置选项
-            var redisConfigOptions = ConfigurationOptions.Parse(redisConnectionString);
-            redisConfigOptions.AbortOnConnectFail = false; // 避免连接失败时崩溃
-            
             siloBuilder
                 .AddRedisGrainStorage("PlayerStorage", options => {
-                    options.ConfigurationOptions = redisConfigOptions;
-                    // 使用不同的数据库通过连接字符串配置
                     var playerConfigOptions = ConfigurationOptions.Parse(redisConnectionString);
                     playerConfigOptions.DefaultDatabase = 0;
                     playerConfigOptions.AbortOnConnectFail = false;
@@ -97,7 +91,7 @@ try
                     options.ConfigurationOptions = matchmakingConfigOptions;
                     Log.Information("MatchmakingStorage Redis配置完成: DB=2");
                 });
-            Log.Information("✅ Orleans Redis存储配置成功");
+            Log.Information("✅ Orleans Redis存储配置成功 - 使用ConfigurationOptions方式");
         }
         catch (Exception ex)
         {

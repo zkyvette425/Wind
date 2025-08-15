@@ -114,6 +114,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 #### 🔧 编写代码时 (技术参考)
 - 📖 **必读**: `docs/Orleans开发规范.md` - 遵循技术规范
 - 📖 **必查**: Context7技术文档 - 确保使用最新API和最佳实践
+- 📖 **必读**: `plans/技术研究记录.md` - 借鉴过往历史
 
 #### ✅ 标记完成前 (强制验证 - 绝不跳过!)
 - 🔴 **必执行**: `dotnet build Wind.sln` - 确保0错误0警告
@@ -124,6 +125,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 #### 🚨 遇到问题时 (问题处理)
 - 📖 **必查**: `plans/质量事故档案.md` - 确认是否为已知问题
 - ✍️ **必记录**: 新问题到质量事故档案 - 建立防范机制
+- ✍️ **必记录**: 记录到`plans/技术研究记录.md` - 反复遇到超过3次,最终得到解决,建立错题集机制
 
 ### 🛡️ 核心质量检查点
 

@@ -47,37 +47,45 @@ public class RedisCacheStrategy : ICacheStrategy, IDisposable
         _accessTimes = new ConcurrentDictionary<string, DateTime>();
         _statistics = new CacheStatistics();
         
-        // 初始化TTL策略映射
+        // 初始化TTL策略映射 - 基于Orleans Redis存储优化
         _ttlStrategies = new Dictionary<string, TimeSpan>
         {
-            // 用户会话数据 - 较长TTL (2小时)
-            ["session"] = TimeSpan.FromHours(2),
-            ["user_session"] = TimeSpan.FromHours(2),
-            
-            // 玩家状态数据 - 中等TTL (30分钟)
-            ["player_state"] = TimeSpan.FromMinutes(30),
+            // Orleans PlayerStorage (DB0) 相关缓存 - 适中TTL，频繁访问
+            ["player_state"] = TimeSpan.FromMinutes(45), // 与Orleans存储同步更久
             ["player_info"] = TimeSpan.FromMinutes(30),
-            ["player_position"] = TimeSpan.FromMinutes(15),
+            ["player_position"] = TimeSpan.FromMinutes(20), // 位置更新频繁，适当延长
+            ["player_session"] = TimeSpan.FromHours(2), // 会话数据保持较长
             
-            // 房间数据 - 中等TTL (15分钟)
-            ["room_state"] = TimeSpan.FromMinutes(15),
-            ["room_info"] = TimeSpan.FromMinutes(15),
+            // Orleans RoomStorage (DB1) 相关缓存 - 中等TTL，房间活跃时频繁访问
+            ["room_state"] = TimeSpan.FromMinutes(25), // 房间状态保持更久
+            ["room_info"] = TimeSpan.FromMinutes(20),
+            ["room_players"] = TimeSpan.FromMinutes(15), // 玩家列表变化频繁
+            ["room_config"] = TimeSpan.FromHours(1), // 房间配置相对稳定
             
-            // 匹配数据 - 短TTL (5分钟)
-            ["matchmaking"] = TimeSpan.FromMinutes(5),
-            ["queue_info"] = TimeSpan.FromMinutes(5),
+            // Orleans MatchmakingStorage (DB2) 相关缓存 - 短TTL，快速变化
+            ["matchmaking"] = TimeSpan.FromMinutes(8), // 匹配队列延长保持
+            ["matchmaking_queue"] = TimeSpan.FromMinutes(5),
+            ["matchmaking_stats"] = TimeSpan.FromMinutes(10), // 统计信息可以稍长
             
-            // 消息数据 - 短TTL (10分钟)
-            ["message"] = TimeSpan.FromMinutes(10),
+            // 消息和通信数据 - 基于实时性需求
+            ["message"] = TimeSpan.FromMinutes(15), // 消息历史适当延长
             ["chat_history"] = TimeSpan.FromMinutes(30),
+            ["notification"] = TimeSpan.FromMinutes(10),
             
-            // 临时数据 - 极短TTL (1分钟)
-            ["temp"] = TimeSpan.FromMinutes(1),
+            // 系统级缓存 - 长TTL，变化较少
+            ["system_config"] = TimeSpan.FromHours(2),
+            ["game_config"] = TimeSpan.FromHours(1),
+            ["auth_token"] = TimeSpan.FromMinutes(15), // JWT相关缓存
+            
+            // 临时和验证数据 - 极短TTL
+            ["temp"] = TimeSpan.FromMinutes(2), // 临时数据稍微延长
             ["verification"] = TimeSpan.FromMinutes(5),
+            ["rate_limit"] = TimeSpan.FromMinutes(1), // 限流数据
             
-            // 配置数据 - 长TTL (1小时)
-            ["config"] = TimeSpan.FromHours(1),
-            ["system_config"] = TimeSpan.FromHours(2)
+            // 性能优化缓存 - 基于访问模式
+            ["lookup"] = TimeSpan.FromMinutes(30), // 查找类数据
+            ["aggregation"] = TimeSpan.FromMinutes(20), // 聚合统计数据
+            ["hot_data"] = TimeSpan.FromMinutes(60) // 热点数据保持更久
         };
         
         // 启动清理定时器

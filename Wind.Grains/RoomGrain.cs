@@ -3,6 +3,8 @@ using Orleans;
 using Wind.GrainInterfaces;
 using Wind.Shared.Models;
 using Wind.Shared.Protocols;
+using Wind.Shared.Services;
+using Wind.Shared.Extensions;
 
 namespace Wind.Grains
 {
@@ -14,12 +16,16 @@ namespace Wind.Grains
     public class RoomGrain : Grain, IRoomGrain
     {
         private readonly ILogger<RoomGrain> _logger;
+        private readonly IDistributedLock _distributedLock;
         private RoomState? _roomState;
-        private readonly object _lockObject = new object();
+        private readonly object _lockObject = new object(); // 临时保留，逐步替换为分布式锁
 
-        public RoomGrain(ILogger<RoomGrain> logger)
+        public RoomGrain(
+            ILogger<RoomGrain> logger,
+            IDistributedLock distributedLock)
         {
             _logger = logger;
+            _distributedLock = distributedLock;
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -32,13 +38,13 @@ namespace Wind.Grains
 
         public async Task<CreateRoomResponse> CreateRoomAsync(CreateRoomRequest request)
         {
-            try
+            var roomId = this.GetPrimaryKeyString();
+            return await _distributedLock.WithRoomLockAsync(roomId, async () =>
             {
-                var roomId = this.GetPrimaryKeyString();
-                _logger.LogInformation("创建房间: {RoomId} by {CreatorId}", roomId, request.CreatorId);
-
-                lock (_lockObject)
+                try
                 {
+                    _logger.LogInformation("创建房间: {RoomId} by {CreatorId}", roomId, request.CreatorId);
+
                     if (_roomState != null)
                     {
                         return new CreateRoomResponse
@@ -62,7 +68,6 @@ namespace Wind.Grains
                         CreatedAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow
                     };
-                }
 
                 // 添加房间创建事件
                 await AddRoomEventAsync(RoomEventType.GameStarted, request.CreatorId, $"房间 '{request.RoomName}' 创建成功");
@@ -84,12 +89,16 @@ namespace Wind.Grains
                     Message = $"创建房间失败: {ex.Message}"
                 };
             }
+            });
         }
 
         public async Task<JoinRoomResponse> JoinRoomAsync(JoinRoomRequest request)
         {
-            try
+            var roomId = this.GetPrimaryKeyString();
+            return await _distributedLock.WithRoomLockAsync(roomId, async () =>
             {
+                try
+                {
                 _logger.LogInformation("玩家加入房间: {PlayerId} -> {RoomId}", request.PlayerId, request.RoomId);
 
                 if (!await IsExistsAsync())
@@ -210,12 +219,16 @@ namespace Wind.Grains
                     Message = $"加入房间失败: {ex.Message}"
                 };
             }
+            });
         }
 
         public async Task<LeaveRoomResponse> LeaveRoomAsync(LeaveRoomRequest request)
         {
-            try
+            var roomId = this.GetPrimaryKeyString();
+            return await _distributedLock.WithRoomLockAsync(roomId, async () =>
             {
+                try
+                {
                 _logger.LogInformation("玩家离开房间: {PlayerId} <- {RoomId}", request.PlayerId, request.RoomId);
 
                 if (!await IsExistsAsync())
@@ -302,6 +315,7 @@ namespace Wind.Grains
                     Message = $"离开房间失败: {ex.Message}"
                 };
             }
+            });
         }
 
         public async Task<GetRoomInfoResponse> GetRoomInfoAsync(GetRoomInfoRequest request)

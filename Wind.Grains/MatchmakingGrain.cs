@@ -3,6 +3,8 @@ using Orleans;
 using Wind.GrainInterfaces;
 using Wind.Shared.Models;
 using Wind.Shared.Protocols;
+using Wind.Shared.Services;
+using Wind.Shared.Extensions;
 
 namespace Wind.Grains
 {
@@ -14,13 +16,17 @@ namespace Wind.Grains
     public class MatchmakingGrain : Grain, IMatchmakingGrain
     {
         private readonly ILogger<MatchmakingGrain> _logger;
+        private readonly IDistributedLock _distributedLock;
         private MatchmakingState? _matchmakingState;
-        private readonly object _lockObject = new object();
+        private readonly object _lockObject = new object(); // 临时保留，逐步替换为分布式锁
         private Timer? _matchCheckTimer;
 
-        public MatchmakingGrain(ILogger<MatchmakingGrain> logger)
+        public MatchmakingGrain(
+            ILogger<MatchmakingGrain> logger,
+            IDistributedLock distributedLock)
         {
             _logger = logger;
+            _distributedLock = distributedLock;
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)

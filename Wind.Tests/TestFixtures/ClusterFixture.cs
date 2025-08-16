@@ -6,6 +6,7 @@ using Orleans.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Wind.Server.Services;
+using Wind.Server.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace Wind.Tests.TestFixtures;
@@ -16,6 +17,7 @@ namespace Wind.Tests.TestFixtures;
 public class ClusterFixture : IDisposable
 {
     public TestCluster Cluster { get; private set; }
+    public IServiceProvider ServiceProvider => Cluster.Client.ServiceProvider;
 
     public ClusterFixture()
     {
@@ -93,6 +95,36 @@ public class TestSiloConfigurator : ISiloConfigurator
                 
                 // 注册限流服务
                 services.AddSingleton<RateLimitingService>();
+                
+                // 注册数据同步相关服务（用于集成测试 - 暂时注释，使用Mock对象）
+                // services.AddSingleton<RedisConnectionManager>();
+                // services.AddSingleton<MongoDbConnectionManager>();
+                // services.AddSingleton<IPlayerPersistenceService, MongoPlayerPersistenceService>();
+                // services.AddSingleton<IRoomPersistenceService, MongoRoomPersistenceService>();
+                // services.AddSingleton<IGameRecordPersistenceService, MongoGameRecordPersistenceService>();
+                
+                // 配置数据同步选项
+                services.Configure<DataSyncOptions>(options =>
+                {
+                    options.FlushIntervalMs = 1000; // 测试环境更快的刷新间隔
+                    options.FlushBatchSize = 10;
+                    options.MaxPendingWrites = 100;
+                    options.DefaultCacheExpirySeconds = 300;
+                    options.EnableStatistics = true;
+                    options.MongoCollections = new[] { "Players", "Rooms", "GameRecords", "Messages" };
+                    options.SyncStrategy = new SyncStrategyConfig
+                    {
+                        DefaultStrategy = SyncStrategyType.WriteThrough,
+                        TypeStrategyOverrides = new Dictionary<string, SyncStrategyType>
+                        {
+                            ["PlayerState"] = SyncStrategyType.WriteThrough,
+                            ["RoomState"] = SyncStrategyType.WriteThrough,
+                            ["MessageInfo"] = SyncStrategyType.WriteBehind
+                        }
+                    };
+                });
+                
+                // services.AddSingleton<IDataSyncService, DataSyncService>();
             });
     }
 }

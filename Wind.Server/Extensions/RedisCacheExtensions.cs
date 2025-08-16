@@ -91,12 +91,15 @@ public static class RedisCacheExtensions
             }
         });
         
+        // 注册Redis连接管理器（如果需要更高级的管理功能）
+        services.AddSingleton<RedisConnectionManager>();
+        
+        // 注册新的Redis缓存策略服务（支持TTL和LRU）
+        services.AddSingleton<RedisCacheStrategyService>();
+        
         // 注册Redis缓存策略服务（同时实现ICacheStrategy接口）
         services.AddSingleton<RedisCacheStrategy>();
         services.AddSingleton<ICacheStrategy>(provider => provider.GetRequiredService<RedisCacheStrategy>());
-        
-        // 注册Redis连接管理器（如果需要更高级的管理功能）
-        services.AddSingleton<RedisConnectionManager>();
         
         return services;
     }

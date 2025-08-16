@@ -148,9 +148,9 @@ try
     {
         builder.Services.AddDistributedLock(options =>
         {
-            options.DefaultExpiry = TimeSpan.FromMinutes(5);
-            options.DefaultTimeout = TimeSpan.FromSeconds(30);
-            options.RetryInterval = TimeSpan.FromMilliseconds(100);
+            options.DefaultExpiryMinutes = 5;
+            options.DefaultTimeoutSeconds = 30;
+            options.RetryIntervalMs = 100;
             options.KeyPrefix = "Wind:Lock:";
             options.EnableAutoRenewal = true;
             options.AutoRenewalRatio = 0.7;

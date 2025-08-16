@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
+using Wind.Server.Configuration;
 using System;
 using System.Collections.Concurrent;
 using System.Threading;
@@ -19,7 +20,7 @@ public class RedisDistributedLock : IDistributedLock
     private readonly DistributedLockOptions _options;
     private readonly ConcurrentDictionary<string, RedisLockToken> _activeLocks;
     private readonly DistributedLockStatistics _statistics;
-    private readonly Timer _renewalTimer;
+    private readonly Timer? _renewalTimer;
 
     public RedisDistributedLock(
         IConnectionMultiplexer redis, 
@@ -37,7 +38,7 @@ public class RedisDistributedLock : IDistributedLock
         // 启用自动续期定时器
         if (_options.EnableAutoRenewal)
         {
-            var renewalInterval = TimeSpan.FromMilliseconds(_options.DefaultExpiry.TotalMilliseconds * _options.AutoRenewalRatio / 2);
+            var renewalInterval = TimeSpan.FromMilliseconds(TimeSpan.FromMinutes(_options.DefaultExpiryMinutes).TotalMilliseconds * _options.AutoRenewalRatio / 2);
             _renewalTimer = new Timer(AutoRenewLocks, null, renewalInterval, renewalInterval);
             _logger.LogDebug("分布式锁自动续期已启用，间隔: {Interval}ms", renewalInterval.TotalMilliseconds);
         }
@@ -124,7 +125,7 @@ public class RedisDistributedLock : IDistributedLock
                     break;
                 }
 
-                await Task.Delay(_options.RetryInterval, cancellationToken);
+                await Task.Delay(TimeSpan.FromMilliseconds(_options.RetryIntervalMs), cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -134,7 +135,7 @@ public class RedisDistributedLock : IDistributedLock
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "获取分布式锁重试失败: {LockKey}, 重试次数: {RetryCount}", fullKey, retryCount);
-                await Task.Delay(_options.RetryInterval, cancellationToken);
+                await Task.Delay(TimeSpan.FromMilliseconds(_options.RetryIntervalMs), cancellationToken);
             }
         }
 
@@ -367,7 +368,7 @@ public class RedisDistributedLock : IDistributedLock
         {
             try
             {
-                await RenewAsync(lockToken, _options.DefaultExpiry);
+                await RenewAsync(lockToken, TimeSpan.FromMinutes(_options.DefaultExpiryMinutes));
             }
             catch (Exception ex)
             {

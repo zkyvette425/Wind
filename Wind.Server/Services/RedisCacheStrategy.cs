@@ -28,7 +28,7 @@ public class RedisCacheStrategy : ICacheStrategy, IDisposable
     
     // LRU和统计相关字段
     private readonly ConcurrentDictionary<string, DateTime> _accessTimes;
-    private readonly CacheStatistics _statistics;
+    private readonly Wind.Shared.Services.CacheStatistics _statistics;
     private readonly Timer _cleanupTimer;
     private readonly object _statsLock = new();
 
@@ -45,7 +45,7 @@ public class RedisCacheStrategy : ICacheStrategy, IDisposable
         _logger = logger;
         
         _accessTimes = new ConcurrentDictionary<string, DateTime>();
-        _statistics = new CacheStatistics();
+        _statistics = new Wind.Shared.Services.CacheStatistics();
         
         // 初始化TTL策略映射 - 基于Orleans Redis存储优化
         _ttlStrategies = new Dictionary<string, TimeSpan>
@@ -89,10 +89,11 @@ public class RedisCacheStrategy : ICacheStrategy, IDisposable
         };
         
         // 启动清理定时器
-        _cleanupTimer = new Timer(PerformCleanup, null, _lruOptions.CleanupInterval, _lruOptions.CleanupInterval);
+        var cleanupInterval = TimeSpan.FromMinutes(_lruOptions.CleanupIntervalMinutes);
+        _cleanupTimer = new Timer(PerformCleanup, null, cleanupInterval, cleanupInterval);
         
         _logger.LogInformation("Redis缓存策略已启动，最大容量: {MaxCapacity}, 清理间隔: {CleanupInterval}分钟", 
-            _lruOptions.MaxCapacity, _lruOptions.CleanupInterval.TotalMinutes);
+            _lruOptions.MaxCapacity, _lruOptions.CleanupIntervalMinutes);
     }
 
     #region ICacheStrategy接口实现
@@ -147,7 +148,7 @@ public class RedisCacheStrategy : ICacheStrategy, IDisposable
             }
 
             var jsonValue = JsonSerializer.Serialize(value);
-            var cacheExpiry = expiry ?? _lruOptions.DefaultExpiry;
+            var cacheExpiry = expiry ?? TimeSpan.FromMinutes(_lruOptions.DefaultExpiryMinutes);
 
             var success = await _database.StringSetAsync(fullKey, jsonValue, cacheExpiry);
             stopwatch.Stop();
@@ -270,7 +271,7 @@ public class RedisCacheStrategy : ICacheStrategy, IDisposable
 
             var batch = _database.CreateBatch();
             var tasks = new List<Task<bool>>();
-            var cacheExpiry = expiry ?? _lruOptions.DefaultExpiry;
+            var cacheExpiry = expiry ?? TimeSpan.FromMinutes(_lruOptions.DefaultExpiryMinutes);
             var now = DateTime.UtcNow;
 
             foreach (var kvp in keyValues)
@@ -371,7 +372,7 @@ public class RedisCacheStrategy : ICacheStrategy, IDisposable
                 {
                     var fullKey = BuildCacheKey(item.Key);
                     var jsonValue = JsonSerializer.Serialize(item.Value);
-                    var expiry = item.Expiry ?? _lruOptions.DefaultExpiry;
+                    var expiry = item.Expiry ?? TimeSpan.FromMinutes(_lruOptions.DefaultExpiryMinutes);
 
                     tasks[item.Key] = batch.StringSetAsync(fullKey, jsonValue, expiry);
                     _accessTimes.AddOrUpdate(fullKey, now, (k, v) => now);
@@ -435,7 +436,7 @@ public class RedisCacheStrategy : ICacheStrategy, IDisposable
         }
     }
 
-    public async Task<CacheStatistics> GetStatisticsAsync()
+    public async Task<Wind.Shared.Services.CacheStatistics> GetStatisticsAsync()
     {
         try
         {
@@ -468,7 +469,7 @@ public class RedisCacheStrategy : ICacheStrategy, IDisposable
                         10 * 0.1); // 简化的移动平均
                 }
 
-                return new CacheStatistics
+                return new Wind.Shared.Services.CacheStatistics
                 {
                     TotalRequests = _statistics.TotalRequests,
                     CacheHits = _statistics.CacheHits,

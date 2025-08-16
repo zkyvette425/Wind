@@ -109,32 +109,3 @@ public class CacheStatistics
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 }
 
-/// <summary>
-/// LRU缓存选项
-/// </summary>
-public class LruCacheOptions
-{
-    public int MaxCapacity { get; set; } = 10000;
-    public TimeSpan DefaultExpiry { get; set; } = TimeSpan.FromHours(1);
-    public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromMinutes(15);
-    public double EvictionThreshold { get; set; } = 0.8; // 达到80%容量时开始淘汰
-    public int EvictionBatchSize { get; set; } = 100; // 每次淘汰的数量
-    public bool EnableStatistics { get; set; } = true;
-    public string KeyPrefix { get; set; } = "Wind:Cache:";
-    
-    // 配置属性（用于从appsettings.json读取）
-    public int DefaultExpiryMinutes 
-    { 
-        get => (int)DefaultExpiry.TotalMinutes; 
-        set => DefaultExpiry = TimeSpan.FromMinutes(value); 
-    }
-    
-    public int CleanupIntervalMinutes 
-    { 
-        get => (int)CleanupInterval.TotalMinutes; 
-        set => CleanupInterval = TimeSpan.FromMinutes(value); 
-    }
-    
-    public bool EnableAutoCleanup { get; set; } = true;
-    public double TargetHitRate { get; set; } = 90.0;
-}

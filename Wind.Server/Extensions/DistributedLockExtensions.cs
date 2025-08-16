@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Wind.Server.Services;
+using Wind.Server.Configuration;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,22 +23,22 @@ public static class DistributedLockExtensions
         services.Configure<DistributedLockOptions>(configuration.GetSection("DistributedLock"));
         
         // 注册分布式锁服务
-        services.AddSingleton<IDistributedLock, RedisDistributedLock>();
+        services.AddSingleton<RedisDistributedLockService>();
         
         return services;
     }
 
     /// <summary>
-    /// 注册分布式锁服务（使用默认配置）
+    /// 注册分布式锁服务（使用委托配置）
     /// </summary>
-    public static IServiceCollection AddDistributedLock(this IServiceCollection services, Action<DistributedLockOptions>? configure = null)
+    public static IServiceCollection AddDistributedLock(this IServiceCollection services, Action<DistributedLockOptions> configure)
     {
         services.Configure<DistributedLockOptions>(options =>
         {
             // 设置默认值
-            options.DefaultExpiry = TimeSpan.FromMinutes(5);
-            options.DefaultTimeout = TimeSpan.FromSeconds(30);
-            options.RetryInterval = TimeSpan.FromMilliseconds(100);
+            options.DefaultExpiryMinutes = 5;
+            options.DefaultTimeoutSeconds = 30;
+            options.RetryIntervalMs = 100;
             options.KeyPrefix = "Wind:Lock:";
             options.EnableAutoRenewal = true;
             options.AutoRenewalRatio = 0.7;
@@ -48,7 +49,7 @@ public static class DistributedLockExtensions
             configure?.Invoke(options);
         });
         
-        services.AddSingleton<IDistributedLock, RedisDistributedLock>();
+        services.AddSingleton<RedisDistributedLockService>();
         
         return services;
     }

@@ -61,6 +61,9 @@ namespace Wind.Shared.Models
 
         [Key(16)]
         public Dictionary<string, object> CustomData { get; set; } = new();
+
+        [Key(17)]
+        public DateTime LastActivityAt { get; set; } = DateTime.UtcNow;
     }
 
     /// <summary>

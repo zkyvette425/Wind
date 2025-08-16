@@ -469,7 +469,14 @@ public class DistributedLockIntegrationTests : IDisposable
 
     private PlayerGrain CreatePlayerGrain(string playerId)
     {
-        var grain = new PlayerGrain(_mockPlayerLogger.Object, _mockDistributedLock.Object);
+        // 创建Mock缓存策略
+        var mockCacheStrategy = new Mock<ICacheStrategy>();
+        mockCacheStrategy.Setup(x => x.GetAsync<PlayerState>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                        .ReturnsAsync((PlayerState?)null);
+        mockCacheStrategy.Setup(x => x.SetAsync(It.IsAny<string>(), It.IsAny<PlayerState>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
+                        .ReturnsAsync(true);
+        
+        var grain = new PlayerGrain(_mockPlayerLogger.Object, _mockDistributedLock.Object, mockCacheStrategy.Object);
         
         // 手动调用OnActivateAsync来初始化状态
         grain.OnActivateAsync(CancellationToken.None).Wait();
@@ -479,7 +486,14 @@ public class DistributedLockIntegrationTests : IDisposable
 
     private RoomGrain CreateRoomGrain(string roomId)
     {
-        var grain = new RoomGrain(_mockRoomLogger.Object, _mockDistributedLock.Object);
+        // 创建Mock缓存策略
+        var mockCacheStrategy = new Mock<ICacheStrategy>();
+        mockCacheStrategy.Setup(x => x.GetRoomCacheAsync<RoomState>(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                        .ReturnsAsync((RoomState?)null);
+        mockCacheStrategy.Setup(x => x.SetRoomCacheAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<RoomState>(), It.IsAny<TimeSpan?>(), It.IsAny<CancellationToken>()))
+                        .ReturnsAsync(true);
+        
+        var grain = new RoomGrain(_mockRoomLogger.Object, _mockDistributedLock.Object, mockCacheStrategy.Object);
         
         // 手动调用OnActivateAsync来初始化状态
         grain.OnActivateAsync(CancellationToken.None).Wait();

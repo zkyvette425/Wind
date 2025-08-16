@@ -11,27 +11,53 @@ namespace Wind.Grains
     /// <summary>
     /// 房间Grain实现
     /// 负责管理单个房间的状态、玩家操作和游戏控制
-    /// 临时使用内存状态，后续添加持久化
+    /// 集成Redis缓存策略优化性能
     /// </summary>
     public class RoomGrain : Grain, IRoomGrain
     {
         private readonly ILogger<RoomGrain> _logger;
         private readonly IDistributedLock _distributedLock;
+        private readonly ICacheStrategy _cacheStrategy;
         private RoomState? _roomState;
         private readonly object _lockObject = new object(); // 临时保留，逐步替换为分布式锁
 
         public RoomGrain(
             ILogger<RoomGrain> logger,
-            IDistributedLock distributedLock)
+            IDistributedLock distributedLock,
+            ICacheStrategy cacheStrategy)
         {
             _logger = logger;
             _distributedLock = distributedLock;
+            _cacheStrategy = cacheStrategy;
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
             var roomId = this.GetPrimaryKeyString();
             _logger.LogInformation("RoomGrain激活: {RoomId}", roomId);
+
+            // 尝试从缓存加载房间状态
+            _roomState = await _cacheStrategy.GetRoomCacheAsync<RoomState>(roomId, "room_state", cancellationToken);
+            
+            if (_roomState != null)
+            {
+                _logger.LogInformation("房间状态已从缓存加载: {RoomId}, 状态: {Status}, 玩家数: {PlayerCount}", 
+                    roomId, _roomState.Status, _roomState.Players.Count);
+                
+                // 更新最后活跃时间
+                _roomState.LastActivityAt = DateTime.UtcNow;
+                
+                // 异步更新缓存中的活跃时间
+                _ = Task.Run(async () =>
+                {
+                    await _cacheStrategy.SetRoomCacheAsync(roomId, "room_state", _roomState, 
+                        TimeSpan.FromMinutes(25), cancellationToken);
+                }, cancellationToken);
+            }
+            else
+            {
+                _logger.LogInformation("未找到房间状态缓存，将在首次创建时初始化: {RoomId}", roomId);
+            }
 
             await base.OnActivateAsync(cancellationToken);
         }

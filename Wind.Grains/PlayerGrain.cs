@@ -11,20 +11,23 @@ namespace Wind.Grains
     /// <summary>
     /// 玩家Grain实现
     /// 负责管理单个玩家的状态和行为
-    /// 使用分布式锁保护并发操作（持久化将在后续添加）
+    /// 使用分布式锁保护并发操作，集成Redis缓存策略优化
     /// </summary>
     public class PlayerGrain : Grain, IPlayerGrain
     {
         private readonly ILogger<PlayerGrain> _logger;
         private readonly IDistributedLock _distributedLock;
+        private readonly ICacheStrategy _cacheStrategy;
         private PlayerState? _playerState;
 
         public PlayerGrain(
             ILogger<PlayerGrain> logger,
-            IDistributedLock distributedLock)
+            IDistributedLock distributedLock,
+            ICacheStrategy cacheStrategy)
         {
             _logger = logger;
             _distributedLock = distributedLock;
+            _cacheStrategy = cacheStrategy;
         }
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
@@ -32,19 +35,49 @@ namespace Wind.Grains
             var playerId = this.GetPrimaryKeyString();
             _logger.LogInformation("PlayerGrain激活: {PlayerId}", playerId);
 
-            // 初始化玩家状态（内存版本，持久化将在后续添加）
-            _playerState = new PlayerState
-            {
-                PlayerId = playerId,
-                DisplayName = $"Player_{playerId[..Math.Min(8, playerId.Length)]}", // 默认显示名
-                CreatedAt = DateTime.UtcNow,
-                LastLoginAt = DateTime.UtcNow,
-                LastActiveAt = DateTime.UtcNow,
-                OnlineStatus = PlayerOnlineStatus.Offline,
-                Version = 1
-            };
+            // 尝试从缓存加载玩家状态
+            _playerState = await _cacheStrategy.GetOrSetPlayerWithLockAsync(
+                _distributedLock,
+                playerId,
+                "player_state",
+                async () =>
+                {
+                    // 缓存未命中，创建新玩家状态
+                    _logger.LogInformation("创建新玩家状态: {PlayerId}", playerId);
+                    return new PlayerState
+                    {
+                        PlayerId = playerId,
+                        DisplayName = $"Player_{playerId[..Math.Min(8, playerId.Length)]}", // 默认显示名
+                        CreatedAt = DateTime.UtcNow,
+                        LastLoginAt = DateTime.UtcNow,
+                        LastActiveAt = DateTime.UtcNow,
+                        OnlineStatus = PlayerOnlineStatus.Offline,
+                        Version = 1
+                    };
+                },
+                TimeSpan.FromMinutes(45), // 使用player_state的TTL策略
+                cancellationToken);
 
-            _logger.LogInformation("创建新玩家状态: {PlayerId}", playerId);
+            if (_playerState != null)
+            {
+                _logger.LogInformation("玩家状态已加载: {PlayerId}, 版本: {Version}, 缓存状态: {CacheStatus}", 
+                    playerId, _playerState.Version, _playerState.Version == 1 ? "新建" : "缓存");
+                
+                // 更新最后活跃时间
+                _playerState.LastActiveAt = DateTime.UtcNow;
+                
+                // 异步更新缓存中的活跃时间
+                _ = Task.Run(async () =>
+                {
+                    await _cacheStrategy.SetPlayerCacheAsync(playerId, "player_state", _playerState, 
+                        TimeSpan.FromMinutes(45), cancellationToken);
+                }, cancellationToken);
+            }
+            else
+            {
+                _logger.LogError("无法初始化玩家状态: {PlayerId}", playerId);
+                throw new InvalidOperationException($"无法初始化玩家状态: {playerId}");
+            }
 
             await base.OnActivateAsync(cancellationToken);
         }
@@ -86,11 +119,25 @@ namespace Wind.Grains
                     _playerState.LastActiveAt = DateTime.UtcNow;
                     _playerState.Version++;
 
-                    // TODO: 保存状态到Redis（持久化将在后续添加）
+                    // 更新缓存中的玩家状态
+                    await _cacheStrategy.SetPlayerCacheAsync(request.PlayerId, "player_state", _playerState, 
+                        TimeSpan.FromMinutes(45));
+                    
+                    // 设置玩家会话缓存
+                    await _cacheStrategy.SetPlayerSessionAsync(request.PlayerId, sessionId, new
+                    {
+                        ClientVersion = request.ClientVersion,
+                        Platform = request.Platform,
+                        DeviceId = request.DeviceId,
+                        LoginTime = DateTime.UtcNow
+                    });
+                    
+                    // 更新在线状态缓存
+                    await _cacheStrategy.RefreshPlayerOnlineStatusAsync(request.PlayerId, PlayerOnlineStatus.Online);
 
                     var playerInfo = MapToPlayerInfo(_playerState);
 
-                    _logger.LogInformation("玩家登录成功: {PlayerId}, SessionId: {SessionId}, 版本: {Version}", 
+                    _logger.LogInformation("玩家登录成功: {PlayerId}, SessionId: {SessionId}, 版本: {Version}, 缓存已更新", 
                         request.PlayerId, sessionId, _playerState.Version);
 
                     return new PlayerLoginResponse
@@ -564,25 +611,45 @@ namespace Wind.Grains
             try
             {
                 // 心跳是高频操作，使用tryLock避免阻塞
-                var success = await _distributedLock.TryWithLockAsync(
-                    $"Player:{playerId}:Heartbeat",
-                    async () =>
-                    {
-                        // 确保状态已初始化
-                        if (_playerState == null)
-                        {
-                            return;
-                        }
-
-                        _playerState.LastActiveAt = DateTime.UtcNow;
-                        // 心跳不写入Redis，减少频繁写入
-                        // await _playerState.WriteStateAsync();
-                    },
-                    expiry: TimeSpan.FromSeconds(10),
-                    timeout: TimeSpan.FromSeconds(1)
+                var lockToken = await _distributedLock.TryAcquireAsync(
+                    $"lock:player:{playerId}:heartbeat",
+                    TimeSpan.FromSeconds(10),
+                    TimeSpan.FromSeconds(1)
                 );
 
-                return success;
+                if (lockToken == null)
+                {
+                    // 获取锁失败，但心跳仍然有效（可能其他线程在处理）
+                    return true;
+                }
+
+                try
+                {
+                    // 确保状态已初始化
+                    if (_playerState == null)
+                    {
+                        return false;
+                    }
+
+                    _playerState.LastActiveAt = DateTime.UtcNow;
+                    
+                    // 心跳操作，延长在线状态缓存时间
+                    await _cacheStrategy.RefreshPlayerOnlineStatusAsync(playerId, _playerState.OnlineStatus);
+                    
+                    // 每10次心跳才更新主状态缓存（减少频繁写入）
+                    var heartbeatCount = (_playerState.Version % 10);
+                    if (heartbeatCount == 0)
+                    {
+                        await _cacheStrategy.SetPlayerCacheAsync(playerId, "player_state", _playerState, 
+                            TimeSpan.FromMinutes(45));
+                    }
+                    
+                    return true;
+                }
+                finally
+                {
+                    await lockToken.ReleaseAsync();
+                }
             }
             catch (Exception ex)
             {

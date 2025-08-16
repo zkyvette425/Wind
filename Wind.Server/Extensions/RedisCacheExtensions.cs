@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using Wind.Server.Configuration;
 using Wind.Server.Services;
+using Wind.Shared.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Wind.Server.Extensions;
@@ -20,6 +21,10 @@ public static class RedisCacheExtensions
     {
         // 配置Redis选项
         services.Configure<RedisOptions>(configuration.GetSection(RedisOptions.SectionName));
+        
+        // 配置LRU缓存选项
+        services.Configure<LruCacheOptions>(configuration.GetSection("LruCache") ?? 
+            configuration.GetSection("CacheStrategy"));
         
         // 注册Redis连接管理器（单例）
         services.AddSingleton<IConnectionMultiplexer>(serviceProvider =>
@@ -86,8 +91,9 @@ public static class RedisCacheExtensions
             }
         });
         
-        // 注册Redis缓存策略服务
+        // 注册Redis缓存策略服务（同时实现ICacheStrategy接口）
         services.AddSingleton<RedisCacheStrategy>();
+        services.AddSingleton<ICacheStrategy>(provider => provider.GetRequiredService<RedisCacheStrategy>());
         
         // 注册Redis连接管理器（如果需要更高级的管理功能）
         services.AddSingleton<RedisConnectionManager>();
@@ -167,7 +173,7 @@ public static class RedisCacheExtensions
         try
         {
             var multiplexer = serviceProvider.GetRequiredService<IConnectionMultiplexer>();
-            var cacheStrategy = serviceProvider.GetRequiredService<RedisCacheStrategy>();
+            var cacheStrategy = serviceProvider.GetRequiredService<ICacheStrategy>();
             
             // 检查连接状态
             var isConnected = multiplexer.IsConnected;
@@ -181,17 +187,20 @@ public static class RedisCacheExtensions
             }
             
             // 获取缓存统计
-            var stats = await cacheStrategy.GetCacheStatisticsAsync();
+            var stats = await cacheStrategy.GetStatisticsAsync();
             
             var details = new Dictionary<string, object>
             {
                 ["connected"] = true,
                 ["endpoints"] = multiplexer.GetEndPoints().Select(ep => ep.ToString()).ToArray(),
-                ["used_memory_mb"] = stats.UsedMemory / 1024.0 / 1024.0,
+                ["used_memory_mb"] = stats.MemoryUsage / 1024.0 / 1024.0,
                 ["total_keys"] = stats.TotalKeys,
                 ["hit_rate_percent"] = stats.HitRate,
                 ["expired_keys"] = stats.ExpiredKeys,
-                ["evicted_keys"] = stats.EvictedKeys
+                ["total_requests"] = stats.TotalRequests,
+                ["cache_hits"] = stats.CacheHits,
+                ["cache_misses"] = stats.CacheMisses,
+                ["avg_response_time_ms"] = stats.AverageResponseTime.TotalMilliseconds
             };
             
             // 判断健康状态

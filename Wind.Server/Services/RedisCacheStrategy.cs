@@ -3,28 +3,49 @@ using Microsoft.Extensions.Options;
 using Wind.Server.Configuration;
 using Microsoft.Extensions.Logging;
 using Wind.Shared.Models;
+using Wind.Shared.Services;
 using MessagePack;
+using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Text.Json;
 
 namespace Wind.Server.Services;
 
 /// <summary>
 /// Redis缓存策略服务
-/// 管理不同数据类型的TTL过期策略和缓存性能优化
+/// 实现ICacheStrategy接口，提供LRU淘汰、缓存预热、命中率监控等高级功能
 /// </summary>
-public class RedisCacheStrategy
+public class RedisCacheStrategy : ICacheStrategy, IDisposable
 {
     private readonly IDatabase _database;
+    private readonly IServer _server;
     private readonly RedisOptions _redisOptions;
+    private readonly LruCacheOptions _lruOptions;
     private readonly ILogger<RedisCacheStrategy> _logger;
     
     // 预定义的TTL策略
     private readonly Dictionary<string, TimeSpan> _ttlStrategies;
+    
+    // LRU和统计相关字段
+    private readonly ConcurrentDictionary<string, DateTime> _accessTimes;
+    private readonly CacheStatistics _statistics;
+    private readonly Timer _cleanupTimer;
+    private readonly object _statsLock = new();
 
-    public RedisCacheStrategy(IConnectionMultiplexer redis, IOptions<RedisOptions> redisOptions, ILogger<RedisCacheStrategy> logger)
+    public RedisCacheStrategy(
+        IConnectionMultiplexer redis, 
+        IOptions<RedisOptions> redisOptions, 
+        IOptions<LruCacheOptions> lruOptions,
+        ILogger<RedisCacheStrategy> logger)
     {
         _database = redis.GetDatabase();
+        _server = redis.GetServer(redis.GetEndPoints().First());
         _redisOptions = redisOptions.Value;
+        _lruOptions = lruOptions.Value;
         _logger = logger;
+        
+        _accessTimes = new ConcurrentDictionary<string, DateTime>();
+        _statistics = new CacheStatistics();
         
         // 初始化TTL策略映射
         _ttlStrategies = new Dictionary<string, TimeSpan>
@@ -58,7 +79,503 @@ public class RedisCacheStrategy
             ["config"] = TimeSpan.FromHours(1),
             ["system_config"] = TimeSpan.FromHours(2)
         };
+        
+        // 启动清理定时器
+        _cleanupTimer = new Timer(PerformCleanup, null, _lruOptions.CleanupInterval, _lruOptions.CleanupInterval);
+        
+        _logger.LogInformation("Redis缓存策略已启动，最大容量: {MaxCapacity}, 清理间隔: {CleanupInterval}分钟", 
+            _lruOptions.MaxCapacity, _lruOptions.CleanupInterval.TotalMinutes);
     }
+
+    #region ICacheStrategy接口实现
+
+    public async Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default)
+    {
+        var fullKey = BuildCacheKey(key);
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            var value = await _database.StringGetAsync(fullKey);
+            stopwatch.Stop();
+
+            if (value.HasValue)
+            {
+                // 更新访问时间（用于LRU）
+                _accessTimes.AddOrUpdate(fullKey, DateTime.UtcNow, (k, v) => DateTime.UtcNow);
+                
+                // 更新统计信息
+                RecordCacheHit(stopwatch.Elapsed);
+                
+                _logger.LogDebug("缓存命中: {Key}, 响应时间: {ResponseTime}ms", fullKey, stopwatch.ElapsedMilliseconds);
+                
+                return JsonSerializer.Deserialize<T>(value!);
+            }
+
+            RecordCacheMiss(stopwatch.Elapsed);
+            _logger.LogDebug("缓存未命中: {Key}", fullKey);
+            return default(T);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            RecordCacheMiss(stopwatch.Elapsed);
+            _logger.LogError(ex, "获取缓存异常: {Key}", fullKey);
+            return default(T);
+        }
+    }
+
+    public async Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiry = null, CancellationToken cancellationToken = default)
+    {
+        var fullKey = BuildCacheKey(key);
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            // 检查容量限制
+            if (await ShouldEvict())
+            {
+                await EvictLruAsync(_lruOptions.EvictionBatchSize, cancellationToken);
+            }
+
+            var jsonValue = JsonSerializer.Serialize(value);
+            var cacheExpiry = expiry ?? _lruOptions.DefaultExpiry;
+
+            var success = await _database.StringSetAsync(fullKey, jsonValue, cacheExpiry);
+            stopwatch.Stop();
+
+            if (success)
+            {
+                _accessTimes.AddOrUpdate(fullKey, DateTime.UtcNow, (k, v) => DateTime.UtcNow);
+                
+                lock (_statsLock)
+                {
+                    _statistics.TotalKeys++;
+                }
+
+                _logger.LogDebug("缓存设置成功: {Key}, 过期时间: {Expiry}s, 响应时间: {ResponseTime}ms", 
+                    fullKey, cacheExpiry.TotalSeconds, stopwatch.ElapsedMilliseconds);
+            }
+
+            return success;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "设置缓存异常: {Key}", fullKey);
+            return false;
+        }
+    }
+
+    public async Task<bool> RemoveAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var fullKey = BuildCacheKey(key);
+
+        try
+        {
+            var deleted = await _database.KeyDeleteAsync(fullKey);
+            if (deleted)
+            {
+                _accessTimes.TryRemove(fullKey, out _);
+                
+                lock (_statsLock)
+                {
+                    _statistics.TotalKeys = Math.Max(0, _statistics.TotalKeys - 1);
+                }
+
+                _logger.LogDebug("缓存删除成功: {Key}", fullKey);
+            }
+
+            return deleted;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "删除缓存异常: {Key}", fullKey);
+            return false;
+        }
+    }
+
+    public async Task<Dictionary<string, T?>> GetManyAsync<T>(IEnumerable<string> keys, CancellationToken cancellationToken = default)
+    {
+        var fullKeys = keys.Select(BuildCacheKey).ToArray();
+        var result = new Dictionary<string, T?>();
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            var redisKeys = fullKeys.Select(k => (RedisKey)k).ToArray();
+            var values = await _database.StringGetAsync(redisKeys);
+            stopwatch.Stop();
+
+            for (int i = 0; i < fullKeys.Length; i++)
+            {
+                var originalKey = keys.ElementAt(i);
+                var fullKey = fullKeys[i];
+
+                if (values[i].HasValue)
+                {
+                    _accessTimes.AddOrUpdate(fullKey, DateTime.UtcNow, (k, v) => DateTime.UtcNow);
+                    result[originalKey] = JsonSerializer.Deserialize<T>(values[i]!);
+                    RecordCacheHit(stopwatch.Elapsed);
+                }
+                else
+                {
+                    result[originalKey] = default(T);
+                    RecordCacheMiss(stopwatch.Elapsed);
+                }
+            }
+
+            _logger.LogDebug("批量获取缓存完成: {KeyCount}个键, 命中: {HitCount}个, 响应时间: {ResponseTime}ms", 
+                fullKeys.Length, result.Values.Count(v => v != null), stopwatch.ElapsedMilliseconds);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "批量获取缓存异常: {KeyCount}个键", fullKeys.Length);
+            
+            // 返回全部miss的结果
+            foreach (var key in keys)
+            {
+                result[key] = default(T);
+                RecordCacheMiss(stopwatch.Elapsed);
+            }
+
+            return result;
+        }
+    }
+
+    public async Task<bool> SetManyAsync<T>(Dictionary<string, T> keyValues, TimeSpan? expiry = null, CancellationToken cancellationToken = default)
+    {
+        if (!keyValues.Any()) return true;
+
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            // 检查容量限制
+            if (await ShouldEvict())
+            {
+                await EvictLruAsync(_lruOptions.EvictionBatchSize, cancellationToken);
+            }
+
+            var batch = _database.CreateBatch();
+            var tasks = new List<Task<bool>>();
+            var cacheExpiry = expiry ?? _lruOptions.DefaultExpiry;
+            var now = DateTime.UtcNow;
+
+            foreach (var kvp in keyValues)
+            {
+                var fullKey = BuildCacheKey(kvp.Key);
+                var jsonValue = JsonSerializer.Serialize(kvp.Value);
+                
+                tasks.Add(batch.StringSetAsync(fullKey, jsonValue, cacheExpiry));
+                _accessTimes.AddOrUpdate(fullKey, now, (k, v) => now);
+            }
+
+            batch.Execute();
+            await Task.WhenAll(tasks);
+            stopwatch.Stop();
+
+            var successCount = tasks.Count(t => t.Result);
+            
+            lock (_statsLock)
+            {
+                _statistics.TotalKeys += successCount;
+            }
+
+            _logger.LogDebug("批量设置缓存完成: {KeyCount}个键, 成功: {SuccessCount}个, 响应时间: {ResponseTime}ms", 
+                keyValues.Count, successCount, stopwatch.ElapsedMilliseconds);
+
+            return successCount == keyValues.Count;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "批量设置缓存异常: {KeyCount}个键", keyValues.Count);
+            return false;
+        }
+    }
+
+    public async Task<bool> ExistsAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var fullKey = BuildCacheKey(key);
+
+        try
+        {
+            var exists = await _database.KeyExistsAsync(fullKey);
+            if (exists)
+            {
+                _accessTimes.AddOrUpdate(fullKey, DateTime.UtcNow, (k, v) => DateTime.UtcNow);
+            }
+            return exists;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "检查缓存存在性异常: {Key}", fullKey);
+            return false;
+        }
+    }
+
+    public async Task<bool> RefreshAsync(string key, TimeSpan expiry, CancellationToken cancellationToken = default)
+    {
+        var fullKey = BuildCacheKey(key);
+
+        try
+        {
+            var refreshed = await _database.KeyExpireAsync(fullKey, expiry);
+            if (refreshed)
+            {
+                _accessTimes.AddOrUpdate(fullKey, DateTime.UtcNow, (k, v) => DateTime.UtcNow);
+                _logger.LogDebug("缓存过期时间更新: {Key}, 新过期时间: {Expiry}s", fullKey, expiry.TotalSeconds);
+            }
+            return refreshed;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "更新缓存过期时间异常: {Key}", fullKey);
+            return false;
+        }
+    }
+
+    public async Task<CacheWarmupResult> WarmupAsync(IEnumerable<CacheWarmupItem> items, CancellationToken cancellationToken = default)
+    {
+        var sortedItems = items.OrderByDescending(x => x.Priority).ToList();
+        var result = new CacheWarmupResult
+        {
+            TotalItems = sortedItems.Count
+        };
+
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            _logger.LogInformation("开始缓存预热: {ItemCount}个项目", sortedItems.Count);
+
+            var batch = _database.CreateBatch();
+            var tasks = new Dictionary<string, Task<bool>>();
+            var now = DateTime.UtcNow;
+
+            foreach (var item in sortedItems)
+            {
+                try
+                {
+                    var fullKey = BuildCacheKey(item.Key);
+                    var jsonValue = JsonSerializer.Serialize(item.Value);
+                    var expiry = item.Expiry ?? _lruOptions.DefaultExpiry;
+
+                    tasks[item.Key] = batch.StringSetAsync(fullKey, jsonValue, expiry);
+                    _accessTimes.AddOrUpdate(fullKey, now, (k, v) => now);
+                }
+                catch (Exception ex)
+                {
+                    result.FailedItems++;
+                    result.FailedKeys.Add(item.Key);
+                    result.ErrorMessages[item.Key] = ex.Message;
+                    _logger.LogWarning(ex, "缓存预热项目准备失败: {Key}", item.Key);
+                }
+            }
+
+            batch.Execute();
+
+            // 等待所有任务完成
+            foreach (var task in tasks)
+            {
+                try
+                {
+                    var success = await task.Value;
+                    if (success)
+                    {
+                        result.SuccessfulItems++;
+                    }
+                    else
+                    {
+                        result.FailedItems++;
+                        result.FailedKeys.Add(task.Key);
+                        result.ErrorMessages[task.Key] = "Redis设置操作失败";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    result.FailedItems++;
+                    result.FailedKeys.Add(task.Key);
+                    result.ErrorMessages[task.Key] = ex.Message;
+                    _logger.LogWarning(ex, "缓存预热项目执行失败: {Key}", task.Key);
+                }
+            }
+
+            stopwatch.Stop();
+            result.Duration = stopwatch.Elapsed;
+
+            lock (_statsLock)
+            {
+                _statistics.TotalKeys += result.SuccessfulItems;
+            }
+
+            _logger.LogInformation("缓存预热完成: 总数={TotalItems}, 成功={SuccessfulItems}, 失败={FailedItems}, 耗时={Duration}ms",
+                result.TotalItems, result.SuccessfulItems, result.FailedItems, result.Duration.TotalMilliseconds);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            result.Duration = stopwatch.Elapsed;
+            _logger.LogError(ex, "缓存预热异常");
+            return result;
+        }
+    }
+
+    public async Task<CacheStatistics> GetStatisticsAsync()
+    {
+        try
+        {
+            var info = await _server.InfoAsync("memory");
+            var memoryUsage = 0L;
+            
+            if (info != null)
+            {
+                var infoString = info.ToString();
+                foreach (var line in infoString.Split('\n'))
+                {
+                    if (line.StartsWith("used_memory:"))
+                    {
+                        long.TryParse(line.Split(':')[1].Trim(), out memoryUsage);
+                        break;
+                    }
+                }
+            }
+
+            lock (_statsLock)
+            {
+                _statistics.MemoryUsage = memoryUsage;
+                _statistics.Timestamp = DateTime.UtcNow;
+                
+                // 计算平均响应时间（简化版本）
+                if (_statistics.TotalRequests > 0)
+                {
+                    _statistics.AverageResponseTime = TimeSpan.FromMilliseconds(
+                        _statistics.AverageResponseTime.TotalMilliseconds * 0.9 + 
+                        10 * 0.1); // 简化的移动平均
+                }
+
+                return new CacheStatistics
+                {
+                    TotalRequests = _statistics.TotalRequests,
+                    CacheHits = _statistics.CacheHits,
+                    CacheMisses = _statistics.CacheMisses,
+                    TotalKeys = _statistics.TotalKeys,
+                    MemoryUsage = _statistics.MemoryUsage,
+                    ExpiredKeys = _statistics.ExpiredKeys,
+                    LastCleanupTime = _statistics.LastCleanupTime,
+                    AverageResponseTime = _statistics.AverageResponseTime,
+                    KeyTypeStats = new Dictionary<string, long>(_statistics.KeyTypeStats),
+                    Timestamp = _statistics.Timestamp
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "获取缓存统计信息异常");
+            return _statistics;
+        }
+    }
+
+    public async Task<int> CleanupExpiredAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var pattern = $"{_lruOptions.KeyPrefix}*";
+            var keys = _server.Keys(pattern: pattern).ToArray();
+            var expiredCount = 0;
+            var batch = _database.CreateBatch();
+            var tasks = new List<Task<bool>>();
+
+            foreach (var key in keys)
+            {
+                if (cancellationToken.IsCancellationRequested) break;
+
+                var ttl = await _database.KeyTimeToLiveAsync(key);
+                if (!ttl.HasValue || ttl.Value.TotalSeconds <= 0)
+                {
+                    tasks.Add(batch.KeyDeleteAsync(key));
+                    _accessTimes.TryRemove(key, out _);
+                    expiredCount++;
+                }
+            }
+
+            if (tasks.Any())
+            {
+                batch.Execute();
+                await Task.WhenAll(tasks);
+            }
+
+            lock (_statsLock)
+            {
+                _statistics.ExpiredKeys += expiredCount;
+                _statistics.TotalKeys = Math.Max(0, _statistics.TotalKeys - expiredCount);
+                _statistics.LastCleanupTime = DateTime.UtcNow;
+            }
+
+            _logger.LogInformation("清理过期缓存完成: 清理了{ExpiredCount}个过期键", expiredCount);
+            return expiredCount;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "清理过期缓存异常");
+            return 0;
+        }
+    }
+
+    public async Task<int> EvictLruAsync(int maxItems, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // 获取最少使用的键
+            var keysToEvict = _accessTimes
+                .OrderBy(kvp => kvp.Value)
+                .Take(maxItems)
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            if (!keysToEvict.Any())
+            {
+                return 0;
+            }
+
+            var batch = _database.CreateBatch();
+            var tasks = keysToEvict.Select(key => batch.KeyDeleteAsync(key)).ToArray();
+
+            batch.Execute();
+            await Task.WhenAll(tasks);
+
+            var evictedCount = tasks.Count(t => t.Result);
+
+            // 从访问时间记录中移除
+            foreach (var key in keysToEvict)
+            {
+                _accessTimes.TryRemove(key, out _);
+            }
+
+            lock (_statsLock)
+            {
+                _statistics.TotalKeys = Math.Max(0, _statistics.TotalKeys - evictedCount);
+            }
+
+            _logger.LogInformation("LRU淘汰完成: 淘汰了{EvictedCount}个键", evictedCount);
+            return evictedCount;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "LRU淘汰异常");
+            return 0;
+        }
+    }
+
+    #endregion
+
+    #region 原有的TTL策略方法（兼容性保留）
 
     /// <summary>
     /// 设置字符串值并应用智能TTL策略
@@ -247,39 +764,6 @@ public class RedisCacheStrategy
         }
     }
 
-    /// <summary>
-    /// 获取缓存统计信息
-    /// </summary>
-    public async Task<CacheStatistics> GetCacheStatisticsAsync()
-    {
-        try
-        {
-            var server = _database.Multiplexer.GetServer(_database.Multiplexer.GetEndPoints().First());
-            var info = await server.InfoAsync("memory");
-            var keyspace = await server.InfoAsync("keyspace");
-            
-            var stats = new CacheStatistics
-            {
-                UsedMemory = GetInfoValue(info, "used_memory"),
-                MaxMemory = GetInfoValue(info, "maxmemory"),
-                TotalKeys = GetKeyspaceKeys(keyspace),
-                ExpiredKeys = GetInfoValue(info, "expired_keys"),
-                EvictedKeys = GetInfoValue(info, "evicted_keys"),
-                HitRate = CalculateHitRate(info),
-                Timestamp = DateTime.UtcNow
-            };
-            
-            _logger.LogDebug("缓存统计: 内存使用={UsedMemory}MB, 总键数={TotalKeys}, 命中率={HitRate}%", 
-                stats.UsedMemory / 1024 / 1024, stats.TotalKeys, stats.HitRate);
-                
-            return stats;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "获取缓存统计失败");
-            return new CacheStatistics { Timestamp = DateTime.UtcNow };
-        }
-    }
 
     /// <summary>
     /// 清理过期键（手动触发）
@@ -323,6 +807,90 @@ public class RedisCacheStrategy
 
     #region 私有辅助方法
 
+    private string BuildCacheKey(string key)
+    {
+        return $"{_lruOptions.KeyPrefix}{key}";
+    }
+
+    private void RecordCacheHit(TimeSpan responseTime)
+    {
+        if (!_lruOptions.EnableStatistics) return;
+
+        lock (_statsLock)
+        {
+            _statistics.TotalRequests++;
+            _statistics.CacheHits++;
+            UpdateAverageResponseTime(responseTime);
+        }
+    }
+
+    private void RecordCacheMiss(TimeSpan responseTime)
+    {
+        if (!_lruOptions.EnableStatistics) return;
+
+        lock (_statsLock)
+        {
+            _statistics.TotalRequests++;
+            _statistics.CacheMisses++;
+            UpdateAverageResponseTime(responseTime);
+        }
+    }
+
+    private void UpdateAverageResponseTime(TimeSpan responseTime)
+    {
+        if (_statistics.TotalRequests == 1)
+        {
+            _statistics.AverageResponseTime = responseTime;
+        }
+        else
+        {
+            // 简化的移动平均计算
+            var avgMs = _statistics.AverageResponseTime.TotalMilliseconds;
+            var newAvgMs = (avgMs * 0.9) + (responseTime.TotalMilliseconds * 0.1);
+            _statistics.AverageResponseTime = TimeSpan.FromMilliseconds(newAvgMs);
+        }
+    }
+
+    private async Task<bool> ShouldEvict()
+    {
+        try
+        {
+            var currentKeyCount = _accessTimes.Count;
+            var threshold = _lruOptions.MaxCapacity * _lruOptions.EvictionThreshold;
+            return currentKeyCount >= threshold;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async void PerformCleanup(object? state)
+    {
+        try
+        {
+            _logger.LogDebug("开始定期缓存清理");
+            await CleanupExpiredAsync();
+
+            // 检查是否需要LRU淘汰
+            if (await ShouldEvict())
+            {
+                await EvictLruAsync(_lruOptions.EvictionBatchSize);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "定期缓存清理异常");
+        }
+    }
+
+    public void Dispose()
+    {
+        _cleanupTimer?.Dispose();
+        _accessTimes.Clear();
+        _logger.LogInformation("Redis缓存策略已释放");
+    }
+
     private TimeSpan GetTtlForDataType(string dataType)
     {
         if (_ttlStrategies.TryGetValue(dataType.ToLowerInvariant(), out var ttl))
@@ -340,61 +908,9 @@ public class RedisCacheStrategy
         return $"{prefix}{dataType}:{key}";
     }
 
-    private long GetInfoValue(IGrouping<string, KeyValuePair<string, string>>[] info, string key)
-    {
-        var section = info.FirstOrDefault();
-        if (section != null)
-        {
-            var kvp = section.FirstOrDefault(kv => kv.Key == key);
-            if (long.TryParse(kvp.Value, out var value))
-            {
-                return value;
-            }
-        }
-        return 0;
-    }
-
-    private long GetKeyspaceKeys(IGrouping<string, KeyValuePair<string, string>>[] keyspace)
-    {
-        var db0 = keyspace.FirstOrDefault(g => g.Key == "db0");
-        if (db0 != null)
-        {
-            var keysInfo = db0.FirstOrDefault(kv => kv.Key.StartsWith("keys="));
-            if (!string.IsNullOrEmpty(keysInfo.Value))
-            {
-                var keysStr = keysInfo.Value.Split(',')[0].Replace("keys=", "");
-                if (long.TryParse(keysStr, out var keys))
-                {
-                    return keys;
-                }
-            }
-        }
-        return 0;
-    }
-
-    private double CalculateHitRate(IGrouping<string, KeyValuePair<string, string>>[] info)
-    {
-        var hits = GetInfoValue(info, "keyspace_hits");
-        var misses = GetInfoValue(info, "keyspace_misses");
-        var total = hits + misses;
-        
-        if (total == 0) return 0.0;
-        return (double)hits / total * 100.0;
-    }
 
     #endregion
 }
 
-/// <summary>
-/// 缓存统计信息
-/// </summary>
-public class CacheStatistics
-{
-    public long UsedMemory { get; set; }
-    public long MaxMemory { get; set; }
-    public long TotalKeys { get; set; }
-    public long ExpiredKeys { get; set; }
-    public long EvictedKeys { get; set; }
-    public double HitRate { get; set; }
-    public DateTime Timestamp { get; set; }
-}
+#endregion
+

@@ -203,18 +203,20 @@ public class RedisCacheStrategyTests : IClassFixture<RedisCacheStrategyTests.Fix
         }
 
         // Act
-        var stats = await cacheStrategy.GetCacheStatisticsAsync();
+        var stats = await cacheStrategy.GetStatisticsAsync();
 
         // Assert
         Assert.NotNull(stats);
         Assert.True(stats.Timestamp > DateTime.UtcNow.AddMinutes(-1), "统计时间戳应该是最近的");
         
         _output.WriteLine($"✅ 缓存统计:");
-        _output.WriteLine($"  - 内存使用: {stats.UsedMemory / 1024.0 / 1024.0:F2} MB");
+        _output.WriteLine($"  - 内存使用: {stats.MemoryUsage / 1024.0 / 1024.0:F2} MB");
         _output.WriteLine($"  - 总键数: {stats.TotalKeys}");
         _output.WriteLine($"  - 命中率: {stats.HitRate:F1}%");
         _output.WriteLine($"  - 过期键数: {stats.ExpiredKeys}");
-        _output.WriteLine($"  - 淘汰键数: {stats.EvictedKeys}");
+        _output.WriteLine($"  - 总请求数: {stats.TotalRequests}");
+        _output.WriteLine($"  - 缓存命中: {stats.CacheHits}");
+        _output.WriteLine($"  - 缓存未命中: {stats.CacheMisses}");
     }
 
     [Fact]

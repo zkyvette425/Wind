@@ -142,6 +142,28 @@ try
         Log.Warning(ex, "Redis缓存策略配置失败，将跳过Redis功能");
     }
     
+    // 配置分布式锁服务
+    Log.Information("配置分布式锁服务");
+    try
+    {
+        builder.Services.AddDistributedLock(options =>
+        {
+            options.DefaultExpiry = TimeSpan.FromMinutes(5);
+            options.DefaultTimeout = TimeSpan.FromSeconds(30);
+            options.RetryInterval = TimeSpan.FromMilliseconds(100);
+            options.KeyPrefix = "Wind:Lock:";
+            options.EnableAutoRenewal = true;
+            options.AutoRenewalRatio = 0.7;
+            options.EnableStatistics = true;
+            options.MaxRetries = 100;
+        });
+        Log.Information("分布式锁服务注册成功");
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "分布式锁配置失败，将跳过分布式锁功能");
+    }
+    
     // Orleans Redis存储配置已移动到SiloBuilder中（见下方UseOrleans配置）
     Log.Information("Orleans Redis Grain存储将在SiloBuilder中配置");
     

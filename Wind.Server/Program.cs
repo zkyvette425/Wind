@@ -205,7 +205,10 @@ try
         // 注册分布式事务服务
         builder.Services.AddSingleton<DistributedTransactionService>();
         
-        Log.Information("MongoDB连接管理器、持久化服务和分布式事务服务已注册");
+        // 注册冲突检测服务
+        builder.Services.AddSingleton<ConflictDetectionService>();
+        
+        Log.Information("MongoDB连接管理器、持久化服务、分布式事务服务和冲突检测服务已注册");
     }
     
     // 验证数据同步设置 (简化，基于新的Redis缓存策略)

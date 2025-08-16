@@ -164,6 +164,7 @@ try
         Log.Warning(ex, "分布式锁配置失败，将跳过分布式锁功能");
     }
     
+    
     // Orleans Redis存储配置已移动到SiloBuilder中（见下方UseOrleans配置）
     Log.Information("Orleans Redis Grain存储将在SiloBuilder中配置");
     
@@ -201,7 +202,10 @@ try
         builder.Services.AddSingleton<IRoomPersistenceService, RoomPersistenceService>();
         builder.Services.AddSingleton<IGameRecordPersistenceService, GameRecordPersistenceService>();
         
-        Log.Information("MongoDB连接管理器和持久化服务已注册");
+        // 注册分布式事务服务
+        builder.Services.AddSingleton<DistributedTransactionService>();
+        
+        Log.Information("MongoDB连接管理器、持久化服务和分布式事务服务已注册");
     }
     
     // 验证数据同步设置 (简化，基于新的Redis缓存策略)

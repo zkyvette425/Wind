@@ -4,6 +4,8 @@ using MongoDB.Driver;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Wind.Server.Configuration;
+using Wind.Server.Models.Documents;
+using Wind.Shared.Models;
 
 namespace Wind.Server.Services;
 
@@ -15,6 +17,9 @@ public class DataSyncService : IDataSyncService, IDisposable
 {
     private readonly RedisConnectionManager _redisManager;
     private readonly MongoDbConnectionManager _mongoManager;
+    private readonly IPlayerPersistenceService _playerPersistence;
+    private readonly IRoomPersistenceService _roomPersistence;
+    private readonly IGameRecordPersistenceService _gameRecordPersistence;
     private readonly ILogger<DataSyncService> _logger;
     private readonly DataSyncOptions _options;
     
@@ -34,11 +39,17 @@ public class DataSyncService : IDataSyncService, IDisposable
     public DataSyncService(
         RedisConnectionManager redisManager,
         MongoDbConnectionManager mongoManager,
+        IPlayerPersistenceService playerPersistence,
+        IRoomPersistenceService roomPersistence,
+        IGameRecordPersistenceService gameRecordPersistence,
         IOptions<DataSyncOptions> options,
         ILogger<DataSyncService> logger)
     {
         _redisManager = redisManager;
         _mongoManager = mongoManager;
+        _playerPersistence = playerPersistence;
+        _roomPersistence = roomPersistence;
+        _gameRecordPersistence = gameRecordPersistence;
         _options = options.Value;
         _logger = logger;
 
@@ -62,12 +73,11 @@ public class DataSyncService : IDataSyncService, IDisposable
         try
         {
             var database = _redisManager.GetDatabase();
-            var collection = GetMongoCollection<T>();
             var json = JsonSerializer.Serialize(data);
 
             // 同时写入Redis和MongoDB
             var redisTask = database.StringSetAsync(key, json, expiry);
-            var mongoTask = UpsertToMongo(collection, key, data);
+            var mongoTask = UpsertToSpecializedPersistence(key, data);
 
             await Task.WhenAll(redisTask, mongoTask);
 
@@ -78,6 +88,96 @@ public class DataSyncService : IDataSyncService, IDisposable
         {
             Interlocked.Increment(ref _syncFailureCount);
             _logger.LogError(ex, "Write-Through失败: {Key}", key);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 玩家数据专用Write-Through策略
+    /// </summary>
+    public async Task WriteThroughPlayerState(string playerId, PlayerState playerState, TimeSpan? expiry = null)
+    {
+        ThrowIfDisposed();
+        
+        try
+        {
+            var database = _redisManager.GetDatabase();
+            var key = $"player:{playerId}";
+            var json = JsonSerializer.Serialize(playerState);
+
+            // 同时写入Redis和MongoDB
+            var redisTask = database.StringSetAsync(key, json, expiry);
+            var mongoTask = _playerPersistence.SavePlayerAsync(playerState);
+
+            await Task.WhenAll(redisTask, mongoTask);
+
+            Interlocked.Increment(ref _writeThroughCount);
+            _logger.LogDebug("玩家数据Write-Through完成: {PlayerId}", playerId);
+        }
+        catch (Exception ex)
+        {
+            Interlocked.Increment(ref _syncFailureCount);
+            _logger.LogError(ex, "玩家数据Write-Through失败: {PlayerId}", playerId);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 房间数据专用Write-Through策略
+    /// </summary>
+    public async Task WriteThroughRoomState(string roomId, RoomState roomState, TimeSpan? expiry = null)
+    {
+        ThrowIfDisposed();
+        
+        try
+        {
+            var database = _redisManager.GetDatabase();
+            var key = $"room:{roomId}";
+            var json = JsonSerializer.Serialize(roomState);
+
+            // 同时写入Redis和MongoDB
+            var redisTask = database.StringSetAsync(key, json, expiry);
+            var mongoTask = _roomPersistence.SaveRoomAsync(roomState);
+
+            await Task.WhenAll(redisTask, mongoTask);
+
+            Interlocked.Increment(ref _writeThroughCount);
+            _logger.LogDebug("房间数据Write-Through完成: {RoomId}", roomId);
+        }
+        catch (Exception ex)
+        {
+            Interlocked.Increment(ref _syncFailureCount);
+            _logger.LogError(ex, "房间数据Write-Through失败: {RoomId}", roomId);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// 游戏记录专用Write-Through策略
+    /// </summary>
+    public async Task WriteThroughGameRecord(string gameId, GameRecordDocument gameRecord, TimeSpan? expiry = null)
+    {
+        ThrowIfDisposed();
+        
+        try
+        {
+            var database = _redisManager.GetDatabase();
+            var key = $"game:{gameId}";
+            var json = JsonSerializer.Serialize(gameRecord);
+
+            // 同时写入Redis和MongoDB
+            var redisTask = database.StringSetAsync(key, json, expiry);
+            var mongoTask = _gameRecordPersistence.SaveGameRecordAsync(gameRecord);
+
+            await Task.WhenAll(redisTask, mongoTask);
+
+            Interlocked.Increment(ref _writeThroughCount);
+            _logger.LogDebug("游戏记录Write-Through完成: {GameId}", gameId);
+        }
+        catch (Exception ex)
+        {
+            Interlocked.Increment(ref _syncFailureCount);
+            _logger.LogError(ex, "游戏记录Write-Through失败: {GameId}", gameId);
             throw;
         }
     }
@@ -334,6 +434,38 @@ public class DataSyncService : IDataSyncService, IDisposable
         var filter = Builders<T>.Filter.Eq("_id", key);
         var options = new ReplaceOptions { IsUpsert = true };
         await collection.ReplaceOneAsync(filter, data, options);
+    }
+
+    /// <summary>
+    /// 根据数据类型选择专用的持久化服务
+    /// </summary>
+    private async Task UpsertToSpecializedPersistence<T>(string key, T data) where T : class
+    {
+        try
+        {
+            switch (data)
+            {
+                case PlayerState playerState:
+                    await _playerPersistence.SavePlayerAsync(playerState);
+                    break;
+                case RoomState roomState:
+                    await _roomPersistence.SaveRoomAsync(roomState);
+                    break;
+                case GameRecordDocument gameRecord:
+                    await _gameRecordPersistence.SaveGameRecordAsync(gameRecord);
+                    break;
+                default:
+                    // 对于其他类型，使用通用的MongoDB操作
+                    var collection = GetMongoCollection<T>();
+                    await UpsertToMongo(collection, key, data);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "专用持久化服务操作失败: {Key}, Type: {Type}", key, typeof(T).Name);
+            throw;
+        }
     }
 
     /// <summary>

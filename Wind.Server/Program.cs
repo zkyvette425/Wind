@@ -190,11 +190,18 @@ try
         Log.Warning("MongoDB配置缺失，将跳过MongoDB集成");
     }
     
-    // 注册MongoDB连接管理器
+    // 注册MongoDB连接管理器和持久化服务
     if (mongoDbOptions != null)
     {
         builder.Services.AddSingleton<MongoDbConnectionManager>();
-        Log.Information("MongoDB连接管理器已注册");
+        builder.Services.AddSingleton<MongoIndexManager>();
+        
+        // 注册持久化服务
+        builder.Services.AddSingleton<IPlayerPersistenceService, PlayerPersistenceService>();
+        builder.Services.AddSingleton<IRoomPersistenceService, RoomPersistenceService>();
+        builder.Services.AddSingleton<IGameRecordPersistenceService, GameRecordPersistenceService>();
+        
+        Log.Information("MongoDB连接管理器和持久化服务已注册");
     }
     
     // 验证数据同步设置 (简化，基于新的Redis缓存策略)
@@ -402,6 +409,22 @@ try
     else
     {
         Log.Warning("⚠️ Redis连接测试失败，但服务仍将启动（降级运行模式）");
+    }
+
+    // 初始化MongoDB索引
+    var mongoIndexManager = app.Services.GetService<MongoIndexManager>();
+    if (mongoIndexManager != null)
+    {
+        try
+        {
+            Log.Information("正在创建MongoDB索引...");
+            await mongoIndexManager.CreateAllIndexesAsync();
+            Log.Information("✅ MongoDB索引创建完成");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "⚠️ MongoDB索引创建失败，但服务仍将启动");
+        }
     }
 
     await app.RunAsync();

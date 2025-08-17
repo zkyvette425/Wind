@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### 🔴 强制执行清单（每次代码修改后必检查）:
 1. ✅ **更新TODO状态** - 标记为"已完成 + 已测试"
-2. 📝 **更新变更记录** - 在 `plans/版本变更日志.md` 中添加详细记录
+2. 📝 **更新变更记录** - 在 `plans/change-logs/current/版本变更日志.md` 中添加详细记录
 3. 📄 **更新相关文档** - 同步更新所有受影响的文档
 
 ### 📋 变更记录详细要求:
@@ -49,35 +49,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **格式要求**: 使用"YYYY年MM月DD日"或"YYYY-MM-DD"格式
 
 ### 📍 纲领位置和获取方式
-- **完整纲领文档**: `plans/纲领.md` - 包含所有技术决策、架构原则和开发规范
+- **完整纲领文档**: `plans/project-management/governance/纲领.md` - 包含所有技术决策、架构原则和开发规范
 - **工作模式指导**: 本文件仅为快速引导，详细指导在纲领文档中
 
 ### 🔄 上下文恢复机制
 **如果上下文发生切换，必须按以下步骤恢复项目一致性：**
 
-1. **阅读纲领文档** (`plans/纲领.md`) - 了解完整的项目愿景和技术决策
-2. **检查当前TODO** (`plans/v1.0-基础架构.md` 等) - 了解当前进展状态  
-3. **查阅变更记录** (`plans/版本变更日志.md`) - 了解最新的变更情况
+1. **阅读纲领文档** (`plans/project-management/governance/纲领.md`) - 了解完整的项目愿景和技术决策
+2. **检查当前TODO** (`plans/project-tracking/current/v1.2-数据存储.md` 等) - 了解当前进展状态  
+3. **查阅变更记录** (`plans/change-logs/current/版本变更日志.md`) - 了解最新的变更情况
 4. **Context7文档查阅** - 确保使用最新技术文档
 
 ### 🔒 强制文档检查触发机制
 
 #### 每次会话开始时必须检查：
 - ✅ 本文件 (`CLAUDE.md`) - 核心工作规范和检查清单
-- ✅ 当前阶段TODO (`plans/v1.0-基础架构.md` 或 `plans/v1.1-核心服务.md`)
-- ✅ 最新变更记录 (`plans/版本变更日志.md` 最后3条记录)
+- ✅ 当前阶段TODO (`plans/project-tracking/current/v1.2-数据存储.md` 等)
+- ✅ 最新变更记录 (`plans/change-logs/current/版本变更日志.md` 最后3条记录)
 
 #### 标记"已测试"前必须检查：
-- 🧪 测试验证管理 (`plans/测试验证管理.md`) - 强制测试流程检查清单
+- 🧪 测试验证管理 (`plans/quality-assurance/testing/测试验证管理.md`) - 强制测试流程检查清单
 - 🧪 运行实际测试验证，不允许假测试
 
 #### 发现质量问题时必须检查：
-- 🚨 质量事故档案 (`plans/质量事故档案.md`) - 查看是否为已知问题，记录新问题
+- 🚨 质量事故档案 (`plans/quality-assurance/incident-archive/质量事故档案.md`) - 查看是否为已知问题，记录新问题
 
 #### 技术决策和架构变更时必须检查：
-- 📋 纲领文档 (`plans/纲领.md`) - 确保决策符合项目原则
-- 📋 技术研究记录 (`plans/技术研究记录.md`) - 查阅相关技术调研
-- 📋 决策记录 (`plans/决策记录.md`) - 记录重要决策
+- 📋 纲领文档 (`plans/project-management/governance/纲领.md`) - 确保决策符合项目原则
+- 📋 技术研究记录 (`plans/technical-research/current/技术研究记录.md`) - 查阅相关技术调研
+- 📋 决策记录 (`plans/project-management/decisions/决策记录.md`) - 记录重要决策
 
 #### 创建新工具或文档时必须检查：
 - 📁 文档组织规范 - 使用标准目录结构
@@ -94,7 +94,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 #### 🔴 变更记录强制流程（禁止跳过）:
 1. **立即更新TODO状态** - 标记✅已完成🧪已测试
-2. **立即更新变更记录** - `plans/版本变更日志.md`添加详细记录
+2. **立即更新变更记录** - `plans/change-logs/current/版本变更日志.md`添加详细记录
 3. **立即更新相关文档** - 同步更新所有受影响文档
 4. **使用准确时间** - 通过`date`命令获取北京时间
 5. **记录具体数据** - 代码行数、文件数、测试结果等
@@ -108,24 +108,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### 📋 工作流程节点
 
 #### 🎯 开始任务时 (必读文档)
-- 📖 **必读**: `plans/纲领.md` - 了解项目方向和技术决策
-- 📖 **必读**: 当前版本TODO文档 (如`plans/v1.1-核心服务.md`) - 了解任务背景和验收标准
+- 📖 **必读**: `plans/project-management/governance/纲领.md` - 了解项目方向和技术决策
+- 📖 **必读**: 当前版本TODO文档 (如`plans/project-tracking/current/v1.2-数据存储.md`) - 了解任务背景和验收标准
 
 #### 🔧 编写代码时 (技术参考)
 - 📖 **必读**: `docs/Orleans开发规范.md` - 遵循技术规范
 - 📖 **必查**: Context7技术文档 - 确保使用最新API和最佳实践
-- 📖 **必读**: `plans/技术研究记录.md` - 借鉴过往历史
+- 📖 **必读**: `plans/technical-research/current/技术研究记录.md` - 借鉴过往历史
 
 #### ✅ 标记完成前 (强制验证 - 绝不跳过!)
 - 🔴 **必执行**: `dotnet build Wind.sln` - 确保0错误0警告
-- 🔴 **必读**: `plans/质量事故档案.md` - 避免重复历史错误
-- 🔴 **必更新**: `plans/版本变更日志.md` - 记录详细变更信息
+- 🔴 **必读**: `plans/quality-assurance/incident-archive/质量事故档案.md` - 避免重复历史错误
+- 🔴 **必更新**: `plans/change-logs/current/版本变更日志.md` - 记录详细变更信息
 - 🔴 **必验证**: 实际测试声称的功能 - 确保真正可用
 
 #### 🚨 遇到问题时 (问题处理)
-- 📖 **必查**: `plans/质量事故档案.md` - 确认是否为已知问题
+- 📖 **必查**: `plans/quality-assurance/incident-archive/质量事故档案.md` - 确认是否为已知问题
 - ✍️ **必记录**: 新问题到质量事故档案 - 建立防范机制
-- ✍️ **必记录**: 记录到`plans/技术研究记录.md` - 反复遇到超过3次,最终得到解决,建立错题集机制
+- ✍️ **必记录**: 记录到`plans/technical-research/current/技术研究记录.md` - 反复遇到超过3次,最终得到解决,建立错题集机制
 
 ### 🛡️ 核心质量检查点
 
@@ -145,7 +145,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **敬畏**: 对用户要求保持敬畏
 - **持续改进**: 从错误中学习
 
-**💡 详细的质量事故档案和防范措施请查看 `plans/质量事故档案.md`**
+**💡 详细的质量事故档案和防范措施请查看 `plans/quality-assurance/incident-archive/质量事故档案.md`**
 
 ---
 
@@ -237,7 +237,7 @@ dotnet test --collect:"XPlat Code Coverage"
 **绝对禁止跳过的强制流程：**
 任何代码修改必须同时更新：
 - ✅ 对应的TODO状态 (已完成 + 已测试)
-- 📝 相关变更记录文档 (`plans/版本变更日志.md` 等)
+- 📝 相关变更记录文档 (`plans/change-logs/current/版本变更日志.md` 等)
 - 📄 影响的其他文档
 - ⏰ 使用准确的北京时间（通过`date`命令获取）
 - 📊 记录具体数据（代码行数、文件数、测试结果）
@@ -306,7 +306,7 @@ tools/
 
 ---
 
-**🚨 关键提醒**: 本文件是快速参考，完整的项目指导和决策依据请查看 `plans/纲领.md`。在任何重大决策前，务必参考纲领文档确保一致性。
+**🚨 关键提醒**: 本文件是快速参考，完整的项目指导和决策依据请查看 `plans/project-management/governance/纲领.md`。在任何重大决策前，务必参考纲领文档确保一致性。
 
 ---
 
@@ -316,7 +316,7 @@ tools/
 
 **强制检查清单（禁止跳过）:**
 1. ✅ 更新TODO状态为"已完成 + 已测试"
-2. 📝 更新 `plans/版本变更日志.md` 详细记录
+2. 📝 更新 `plans/change-logs/current/版本变更日志.md` 详细记录
 3. 📄 更新所有受影响的相关文档
 4. ⏰ 使用`date`命令获取准确北京时间
 5. 📊 记录具体数据（代码行数、文件数、测试结果）

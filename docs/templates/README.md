@@ -8,12 +8,20 @@
 |------|------|----------|
 | `development-tool-template.md` | 开发工具详细文档 | 新建开发环境工具文档 |
 | `tool-package-template.md` | 工具包简短说明 | 工具目录下的README文件 |
+| `technical-research-template.md` | 技术研究记录 | 技术调研和问题解决记录 |
+| `project-tracking-template.md` | 项目进度跟踪 | 版本开发计划和任务管理 |
+| `quality-assurance-template.md` | 质量保证文档 | 质量标准、流程和检查清单 |
+| `change-log-template.md` | 变更日志 | 版本变更记录和影响追踪 |
 
 ## 🎯 使用方法
 
 ### 1. 选择适当模板
-- **详细文档**: 使用 `development-tool-template.md` 
-- **工具说明**: 使用 `tool-package-template.md`
+- **开发工具文档**: 使用 `development-tool-template.md` 
+- **工具包说明**: 使用 `tool-package-template.md`
+- **技术研究记录**: 使用 `technical-research-template.md`
+- **项目进度管理**: 使用 `project-tracking-template.md`
+- **质量保证文档**: 使用 `quality-assurance-template.md`
+- **变更日志记录**: 使用 `change-log-template.md`
 
 ### 2. 复制和定制
 ```bash

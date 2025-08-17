@@ -31,6 +31,11 @@
 - 版本发布前检查
 - 定期维护检查
 
+**关联文档**:
+- 技术配置文档: [docs/development/](../../docs/development/)
+- 测试环境文档: [docs/development/redis-testing.md](../../docs/development/redis-testing.md)
+- 项目变更记录: [plans/change-logs/](../../plans/change-logs/)
+
 ## 🔄 扩展规划
 
 未来计划添加的工具:

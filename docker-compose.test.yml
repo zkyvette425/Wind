@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  redis-test:
+    image: redis:7-alpine
+    container_name: wind-redis-test
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass windgame123
+    volumes:
+      - redis-test-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "windgame123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  mongodb-test:
+    image: mongo:7.0
+    container_name: wind-mongodb-test
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: windapp
+      MONGO_INITDB_ROOT_PASSWORD: windapp123
+      MONGO_INITDB_DATABASE: windgame_test
+    volumes:
+      - mongodb-test-data:/data/db
+      - ./scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis-test-data:
+  mongodb-test-data:

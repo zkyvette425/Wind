@@ -96,12 +96,48 @@ public class TestSiloConfigurator : ISiloConfigurator
                 // 注册限流服务
                 services.AddSingleton<RateLimitingService>();
                 
-                // 注册数据同步相关服务（用于集成测试 - 暂时注释，使用Mock对象）
-                // services.AddSingleton<RedisConnectionManager>();
-                // services.AddSingleton<MongoDbConnectionManager>();
-                // services.AddSingleton<IPlayerPersistenceService, MongoPlayerPersistenceService>();
-                // services.AddSingleton<IRoomPersistenceService, MongoRoomPersistenceService>();
-                // services.AddSingleton<IGameRecordPersistenceService, MongoGameRecordPersistenceService>();
+                // 注册数据存储相关服务（用于集成测试）
+                // 配置Redis连接
+                services.Configure<RedisOptions>(options =>
+                {
+                    options.ConnectionString = "localhost:6379";
+                    options.Password = "windgame123";
+                    options.Database = 0;
+                    options.KeyPrefix = "Wind:Test:";
+                });
+                
+                // 配置MongoDB连接
+                services.Configure<MongoDbOptions>(options =>
+                {
+                    options.ConnectionString = "mongodb://windadmin:windgame123@localhost:27017/windgame_test?authSource=admin";
+                    options.DatabaseName = "windgame_test";
+                });
+                
+                services.AddSingleton<RedisConnectionManager>();
+                services.AddSingleton<MongoDbConnectionManager>();
+                services.AddSingleton<IPlayerPersistenceService, PlayerPersistenceService>();
+                services.AddSingleton<IRoomPersistenceService, RoomPersistenceService>();
+                services.AddSingleton<IGameRecordPersistenceService, GameRecordPersistenceService>();
+                
+                // 注册缓存策略服务
+                services.Configure<LruCacheOptions>(options =>
+                {
+                    options.MaxCapacity = 1000;
+                    options.TargetHitRate = 0.8;
+                });
+                
+                services.Configure<DistributedLockOptions>(options =>
+                {
+                    options.DefaultExpiryMinutes = 5;
+                    options.DefaultTimeoutSeconds = 30;
+                });
+                
+                services.AddSingleton<RedisCacheStrategyService>();
+                services.AddSingleton<RedisDistributedLockService>();
+                
+                // 注册分布式事务和冲突检测服务
+                services.AddSingleton<DistributedTransactionService>();
+                services.AddSingleton<ConflictDetectionService>();
                 
                 // 配置数据同步选项
                 services.Configure<DataSyncOptions>(options =>
@@ -143,6 +179,27 @@ public class TestClientConfigurator : IClientBuilderConfigurator
             {
                 serializerBuilder.AddMessagePackSerializer();
             });
+            
+            // 在客户端也注册测试需要的服务
+            services.Configure<RedisOptions>(options =>
+            {
+                options.ConnectionString = "localhost:6379";
+                options.Password = "windgame123";
+                options.Database = 0;
+                options.KeyPrefix = "Wind:Test:";
+            });
+            
+            services.Configure<MongoDbOptions>(options =>
+            {
+                options.ConnectionString = "mongodb://windadmin:windgame123@localhost:27017/windgame_test?authSource=admin";
+                options.DatabaseName = "windgame_test";
+            });
+            
+            services.AddSingleton<RedisConnectionManager>();
+            services.AddSingleton<MongoDbConnectionManager>();
+            services.AddSingleton<RedisDistributedLockService>();
+            services.AddSingleton<DistributedTransactionService>();
+            services.AddSingleton<ConflictDetectionService>();
         });
     }
 }

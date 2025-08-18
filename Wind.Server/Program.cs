@@ -334,12 +334,19 @@ try
     // builder.Services.AddSingleton<Wind.Server.Filters.JwtAuthorizationFilter>();
     
     // 添加MagicOnion服务 (基于Context7文档)
-    builder.Services.AddMagicOnion();
-    // builder.Services.AddMagicOnion(options =>
-    // {
-    //     // 添加JWT认证过滤器到所有服务 (暂时禁用)
-    //     options.GlobalFilters.Add<Wind.Server.Filters.JwtAuthorizationFilter>();
-    // });
+    builder.Services.AddMagicOnion(options =>
+    {
+        // 添加JWT认证过滤器到所有服务 (暂时禁用，待兼容性修复后启用)
+        // options.GlobalFilters.Add<Wind.Server.Filters.JwtAuthorizationFilter>();
+        
+        Log.Information("MagicOnion服务配置完成");
+    });
+    
+    // 配置全局MessagePack序列化选项
+    MessagePackSerializer.DefaultOptions = MessagePackSerializerOptions.Standard
+        .WithResolver(MessagePack.Resolvers.ContractlessStandardResolver.Instance)
+        .WithSecurity(MessagePackSecurity.UntrustedData);
+    Log.Information("MessagePack序列化器全局配置完成");
     
     // 配置Orleans MessagePack序列化器 (正确位置)
     builder.Services.AddSerializer(serializerBuilder => serializerBuilder.AddMessagePackSerializer());
@@ -364,6 +371,8 @@ try
 
     // 映射MagicOnion服务端点 (基于Context7文档)
     app.MapMagicOnionService();
+    
+    Log.Information("MagicOnion服务端点已映射 - 支持Unary API和Streaming Hub");
     
     // 映射健康检查端点
     app.MapHealthChecks("/health");

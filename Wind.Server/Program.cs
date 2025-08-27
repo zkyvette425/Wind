@@ -351,6 +351,34 @@ try
     // 配置Orleans MessagePack序列化器 (正确位置)
     builder.Services.AddSerializer(serializerBuilder => serializerBuilder.AddMessagePackSerializer());
 
+    // 配置连接池管理服务
+    builder.Services.Configure<ConnectionPoolOptions>(options =>
+    {
+        options.MaxPoolSize = 10000;
+        options.ConnectionTimeoutSeconds = 300;
+        options.IdleTimeoutSeconds = 120;
+        options.CleanupIntervalSeconds = 60;
+        options.EnableConnectionMetrics = true;
+        options.EnableHealthCheck = true;
+    });
+    builder.Services.AddSingleton<ConnectionPoolManager>();
+    Log.Information("连接池管理服务注册完成");
+
+    // 配置负载均衡服务
+    builder.Services.Configure<LoadBalancingOptions>(options =>
+    {
+        options.DefaultStrategy = LoadBalancingStrategy.RoundRobin;
+        options.DefaultWeight = 100;
+        options.NodeTimeoutSeconds = 30;
+        options.HealthCheckIntervalSeconds = 10;
+        options.EnableHealthCheck = true;
+        options.EnableMetrics = true;
+        options.MaxRetries = 3;
+        options.RetryDelayMilliseconds = 1000;
+    });
+    builder.Services.AddSingleton<LoadBalancingService>();
+    Log.Information("负载均衡服务注册完成");
+
     // 添加健康检查
     builder.Services.AddHealthChecks()
         .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy());

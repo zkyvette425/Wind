@@ -23,7 +23,7 @@ public class IsolatedConnectionTest
         try
         {
             // Arrange
-            var connectionString = "localhost:6379";
+            var connectionString = "localhost:6380";
             var connection = ConnectionMultiplexer.Connect($"{connectionString},password=windgame123");
             var database = connection.GetDatabase();
 
@@ -55,7 +55,7 @@ public class IsolatedConnectionTest
         try
         {
             // Arrange
-            var connectionString = "mongodb://windadmin:windgame123@localhost:27017/windgame_test?authSource=admin&connectTimeoutMS=10000&serverSelectionTimeoutMS=10000&ssl=false";
+            var connectionString = "mongodb://localhost:27018/windgame_test?replicaSet=rs0&directConnection=false&connectTimeoutMS=10000&serverSelectionTimeoutMS=10000&ssl=false";
             _output.WriteLine($"使用连接字符串: {connectionString}");
 
             var client = new MongoClient(connectionString);

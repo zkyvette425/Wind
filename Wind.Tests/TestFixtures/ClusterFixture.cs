@@ -97,19 +97,19 @@ public class TestSiloConfigurator : ISiloConfigurator
                 services.AddSingleton<RateLimitingService>();
                 
                 // 注册数据存储相关服务（用于集成测试）
-                // 配置Redis连接
+                // 配置Redis连接 (使用测试专用端口)
                 services.Configure<RedisOptions>(options =>
                 {
-                    options.ConnectionString = "localhost:6379";
+                    options.ConnectionString = "localhost:6380";
                     options.Password = "windgame123";
                     options.Database = 0;
                     options.KeyPrefix = "Wind:Test:";
                 });
                 
-                // 配置MongoDB连接
+                // 配置MongoDB连接 (使用测试专用端口)
                 services.Configure<MongoDbOptions>(options =>
                 {
-                    options.ConnectionString = "mongodb://windadmin:windgame123@localhost:27017/windgame_test?authSource=admin";
+                    options.ConnectionString = "mongodb://localhost:27018/windgame_test?replicaSet=rs0&directConnection=false";
                     options.DatabaseName = "windgame_test";
                 });
                 
@@ -180,10 +180,10 @@ public class TestClientConfigurator : IClientBuilderConfigurator
                 serializerBuilder.AddMessagePackSerializer();
             });
             
-            // 在客户端也注册测试需要的服务
+            // 在客户端也注册测试需要的服务 (使用测试专用端口)
             services.Configure<RedisOptions>(options =>
             {
-                options.ConnectionString = "localhost:6379";
+                options.ConnectionString = "localhost:6380";
                 options.Password = "windgame123";
                 options.Database = 0;
                 options.KeyPrefix = "Wind:Test:";
@@ -191,7 +191,7 @@ public class TestClientConfigurator : IClientBuilderConfigurator
             
             services.Configure<MongoDbOptions>(options =>
             {
-                options.ConnectionString = "mongodb://windadmin:windgame123@localhost:27017/windgame_test?authSource=admin";
+                options.ConnectionString = "mongodb://localhost:27018/windgame_test?replicaSet=rs0&directConnection=false";
                 options.DatabaseName = "windgame_test";
             });
             

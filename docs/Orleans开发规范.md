@@ -167,7 +167,29 @@ public async Task<PlayerInfo> GetPlayerInfoAsync()
 
 ## 🌐 MagicOnion服务开发规范
 
-### 1. 服务接口定义
+### 1. 服务类型选择指南
+
+```csharp
+// 🔥 Unary Service: 用于请求-响应模式
+public interface IPlayerService : IService<IPlayerService>
+{
+    UnaryResult<PlayerInfo> GetPlayerInfoAsync(string playerId);
+}
+
+// 🌊 StreamingHub: 用于实时双向通信
+public interface IChatHub : IStreamingHub<IChatHub, IChatHubReceiver>
+{
+    ValueTask SendMessageAsync(string message);
+}
+
+// 📥 StreamingHub接收器: 定义客户端接收的消息
+public interface IChatHubReceiver
+{
+    void OnMessage(string message);
+}
+```
+
+### 2. 服务接口定义
 
 ```csharp
 // ✅ 正确: 服务接口定义 (放在Wind.Shared项目)
@@ -240,7 +262,170 @@ public class PlayerService : ServiceBase<IPlayerService>, IPlayerService
 }
 ```
 
-### 3. 消息协议规范
+### 3. StreamingHub开发规范 🌊
+
+#### Hub接口定义
+```csharp
+// ✅ 正确: StreamingHub接口定义 (放在Wind.Shared项目)
+namespace Wind.Shared.Services;
+
+/// <summary>
+/// 聊天StreamingHub - 提供实时聊天功能
+/// </summary>
+public interface IChatHub : IStreamingHub<IChatHub, IChatHubReceiver>
+{
+    /// <summary>
+    /// 连接到聊天服务
+    /// </summary>
+    ValueTask ConnectAsync(string playerId, string accessToken);
+    
+    /// <summary>
+    /// 加入房间聊天
+    /// </summary>
+    ValueTask JoinRoomChatAsync(string roomId, string playerId);
+    
+    /// <summary>
+    /// 发送房间聊天消息
+    /// </summary>
+    ValueTask SendRoomChatAsync(string roomId, string playerId, string message);
+    
+    /// <summary>
+    /// 离开房间聊天
+    /// </summary>
+    ValueTask LeaveRoomChatAsync(string roomId, string playerId);
+}
+
+/// <summary>
+/// 聊天Hub接收器 - 定义客户端接收的消息
+/// </summary>
+public interface IChatHubReceiver
+{
+    /// <summary>
+    /// 接收聊天连接成功通知
+    /// </summary>
+    void OnChatConnected(string playerId, long timestamp);
+    
+    /// <summary>
+    /// 接收房间聊天消息
+    /// </summary>
+    void OnRoomChatMessage(string messageId, string roomId, string senderId, 
+        string senderName, string message, string messageType, long timestamp);
+    
+    /// <summary>
+    /// 接收聊天错误通知
+    /// </summary>
+    void OnChatError(string errorCode, string errorMessage);
+}
+```
+
+#### Hub实现规范
+```csharp
+// ✅ 正确: StreamingHub实现 (放在Wind.Server项目)
+namespace Wind.Server.Services;
+
+public class ChatHub : StreamingHubBase<IChatHub, IChatHubReceiver>, IChatHub
+{
+    private readonly IGrainFactory _grainFactory;
+    private readonly ILogger<ChatHub> _logger;
+    
+    // 🔑 关键：保存Group引用以便广播
+    private readonly ConcurrentDictionary<string, IGroup<IChatHubReceiver>> _roomGroups = new();
+
+    public ChatHub(IGrainFactory grainFactory, ILogger<ChatHub> logger)
+    {
+        _grainFactory = grainFactory;
+        _logger = logger;
+    }
+
+    public async ValueTask JoinRoomChatAsync(string roomId, string playerId)
+    {
+        var roomKey = $"room_{roomId}";
+        
+        // ✅ 正确：加入群组并保存引用
+        var roomGroup = await Group.AddAsync(roomKey);
+        _roomGroups.AddOrUpdate(roomKey, roomGroup, (key, oldGroup) => roomGroup);
+        
+        // 通知房间内所有玩家
+        roomGroup.All.OnRoomChatStatusUpdate(roomId, onlineCount, true);
+    }
+
+    public async ValueTask SendRoomChatAsync(string roomId, string playerId, string message)
+    {
+        var roomKey = $"room_{roomId}";
+        
+        // ✅ 正确：使用保存的群组引用广播
+        if (_roomGroups.TryGetValue(roomKey, out var roomGroup))
+        {
+            roomGroup.All.OnRoomChatMessage(messageId, roomId, playerId, 
+                senderName, message, "Text", timestamp);
+        }
+    }
+
+    public async ValueTask LeaveRoomChatAsync(string roomId, string playerId)
+    {
+        var roomKey = $"room_{roomId}";
+        
+        // ✅ 正确：从群组中移除
+        if (_roomGroups.TryGetValue(roomKey, out var roomGroup))
+        {
+            await roomGroup.RemoveAsync(Context);
+        }
+    }
+
+    // ✅ 正确：连接断开时清理
+    protected override async ValueTask OnDisconnected()
+    {
+        // 清理所有群组引用和广播离开事件
+        foreach (var groupPair in _roomGroups.ToList())
+        {
+            var roomGroup = groupPair.Value;
+            var roomId = groupPair.Key.Replace("room_", "");
+            
+            // 广播玩家离开事件
+            roomGroup.All.OnPlayerLeftRoom(roomId, playerId, playerName, "连接断开");
+        }
+    }
+}
+```
+
+#### 🚨 StreamingHub常见错误
+
+```csharp
+// ❌ 错误：不保存Group引用，无法广播
+public async ValueTask JoinRoom(string roomId)
+{
+    await Group.AddAsync($"room_{roomId}");  // 引用丢失！
+    // 后续无法广播消息到这个群组
+}
+
+// ❌ 错误：错误的广播语法
+public async ValueTask SendMessage(string message)
+{
+    var group = await Group.AddAsync("room");
+    group.All.OnMessage(message);  // 缺少await？实际上不需要await
+}
+
+// ❌ 错误：同步方法
+public void SendMessage(string message)  // 应该是async ValueTask
+{
+    // StreamingHub方法必须是异步的
+}
+
+// ✅ 正确：Group广播和排除语法
+public async ValueTask SendMessage(string message)
+{
+    if (_roomGroup != null)
+    {
+        // 广播给所有人
+        _roomGroup.All.OnMessage(message);
+        
+        // 广播给除自己外的所有人
+        _roomGroup.Except(new[] { ConnectionId }).OnMessage(message);
+    }
+}
+```
+
+### 4. 消息协议规范
 
 ```csharp
 // ✅ 正确: 使用MessagePack序列化的消息定义

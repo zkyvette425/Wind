@@ -1,4 +1,5 @@
 using MessagePack;
+using Orleans;
 using System;
 using System.Collections.Generic;
 
@@ -8,173 +9,178 @@ namespace Wind.Shared.Models
     /// 匹配系统状态数据模型
     /// 管理玩家匹配队列和匹配条件
     /// </summary>
+    [GenerateSerializer]
     [MessagePackObject]
     public class MatchmakingState
     {
-        [Key(0)]
+        [Id(0)][Key(0)]
         public int Version { get; set; } = 1;
 
-        [Key(1)]
+        [Id(1)][Key(1)]
         public string MatchmakingId { get; set; } = string.Empty;
 
-        [Key(2)]
+        [Id(2)][Key(2)]
         public Dictionary<string, MatchmakingQueue> Queues { get; set; } = new();
 
-        [Key(3)]
+        [Id(3)][Key(3)]
         public Dictionary<string, MatchmakingRequest> ActiveRequests { get; set; } = new();
 
-        [Key(4)]
+        [Id(4)][Key(4)]
         public MatchmakingSettings Settings { get; set; } = new();
 
-        [Key(5)]
+        [Id(5)][Key(5)]
         public MatchmakingStatistics Statistics { get; set; } = new();
 
-        [Key(6)]
+        [Id(6)][Key(6)]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        [Key(7)]
+        [Id(7)][Key(7)]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 
     /// <summary>
     /// 匹配队列信息
     /// </summary>
+    [GenerateSerializer]
     [MessagePackObject]
     public class MatchmakingQueue
     {
-        [Key(0)]
+        [Id(0)][Key(0)]
         public string QueueId { get; set; } = string.Empty;
 
-        [Key(1)]
+        [Id(1)][Key(1)]
         public string QueueName { get; set; } = string.Empty;
 
-        [Key(2)]
+        [Id(2)][Key(2)]
         public RoomType RoomType { get; set; } = RoomType.Normal;
 
-        [Key(3)]
+        [Id(3)][Key(3)]
         public string GameMode { get; set; } = "Default";
 
-        [Key(4)]
+        [Id(4)][Key(4)]
         public List<MatchmakingRequest> WaitingPlayers { get; set; } = new();
 
-        [Key(5)]
+        [Id(5)][Key(5)]
         public MatchmakingQueueSettings QueueSettings { get; set; } = new();
 
-        [Key(6)]
+        [Id(6)][Key(6)]
         public int TotalPlayersInQueue { get; set; } = 0;
 
-        [Key(7)]
+        [Id(7)][Key(7)]
         public DateTime LastMatchTime { get; set; } = DateTime.UtcNow;
 
-        [Key(8)]
+        [Id(8)][Key(8)]
         public TimeSpan AverageWaitTime { get; set; } = TimeSpan.Zero;
 
-        [Key(9)]
+        [Id(9)][Key(9)]
         public bool IsActive { get; set; } = true;
     }
 
     /// <summary>
     /// 匹配请求信息
     /// </summary>
+    [GenerateSerializer]
     [MessagePackObject]
     public class MatchmakingRequest
     {
-        [Key(0)]
+        [Id(0)][Key(0)]
         public string RequestId { get; set; } = Guid.NewGuid().ToString();
 
-        [Key(1)]
+        [Id(1)][Key(1)]
         public string PlayerId { get; set; } = string.Empty;
 
-        [Key(2)]
+        [Id(2)][Key(2)]
         public string PlayerName { get; set; } = string.Empty;
 
-        [Key(3)]
+        [Id(3)][Key(3)]
         public int PlayerLevel { get; set; } = 1;
 
-        [Key(4)]
+        [Id(4)][Key(4)]
         public string QueueId { get; set; } = string.Empty;
 
-        [Key(5)]
+        [Id(5)][Key(5)]
         public MatchmakingCriteria Criteria { get; set; } = new();
 
-        [Key(6)]
+        [Id(6)][Key(6)]
         public MatchmakingRequestStatus Status { get; set; } = MatchmakingRequestStatus.Queued;
 
-        [Key(7)]
+        [Id(7)][Key(7)]
         public DateTime RequestedAt { get; set; } = DateTime.UtcNow;
 
-        [Key(8)]
+        [Id(8)][Key(8)]
         public DateTime? MatchedAt { get; set; }
 
-        [Key(9)]
+        [Id(9)][Key(9)]
         public string? MatchedRoomId { get; set; }
 
-        [Key(10)]
+        [Id(10)][Key(10)]
         public int RetryCount { get; set; } = 0;
 
-        [Key(11)]
+        [Id(11)][Key(11)]
         public TimeSpan CurrentWaitTime => DateTime.UtcNow - RequestedAt;
 
-        [Key(12)]
+        [Id(12)][Key(12)]
         public Dictionary<string, object> PlayerData { get; set; } = new();
     }
 
     /// <summary>
     /// 匹配条件
     /// </summary>
+    [GenerateSerializer]
     [MessagePackObject]
     public class MatchmakingCriteria
     {
-        [Key(0)]
+        [Id(0)][Key(0)]
         public RoomType PreferredRoomType { get; set; } = RoomType.Normal;
 
-        [Key(1)]
+        [Id(1)][Key(1)]
         public string PreferredGameMode { get; set; } = "Default";
 
-        [Key(2)]
+        [Id(2)][Key(2)]
         public string? PreferredMapId { get; set; }
 
-        [Key(3)]
+        [Id(3)][Key(3)]
         public int MinPlayerLevel { get; set; } = 1;
 
-        [Key(4)]
+        [Id(4)][Key(4)]
         public int MaxPlayerLevel { get; set; } = 999;
 
-        [Key(5)]
+        [Id(5)][Key(5)]
         public int PreferredPlayerCount { get; set; } = 4;
 
-        [Key(6)]
+        [Id(6)][Key(6)]
         public int MinPlayerCount { get; set; } = 2;
 
-        [Key(7)]
+        [Id(7)][Key(7)]
         public int MaxPlayerCount { get; set; } = 8;
 
-        [Key(8)]
+        [Id(8)][Key(8)]
         public string? PreferredRegion { get; set; }
 
-        [Key(9)]
+        [Id(9)][Key(9)]
         public int MaxPing { get; set; } = 200;
 
-        [Key(10)]
+        [Id(10)][Key(10)]
         public bool AllowSpectating { get; set; } = false;
 
-        [Key(11)]
+        [Id(11)][Key(11)]
         public bool CreateNewRoomIfNeeded { get; set; } = true;
 
-        [Key(12)]
+        [Id(12)][Key(12)]
         public Dictionary<string, object> CustomCriteria { get; set; } = new();
     }
 
     /// <summary>
     /// 匹配队列设置
     /// </summary>
+    [GenerateSerializer]
     [MessagePackObject]
     public class MatchmakingQueueSettings
     {
-        [Key(0)]
+        [Id(0)][Key(0)]
         public int MaxPlayersPerMatch { get; set; } = 4;
 
-        [Key(1)]
+        [Id(1)][Key(1)]
         public int MinPlayersPerMatch { get; set; } = 2;
 
         [Key(2)]
@@ -205,6 +211,7 @@ namespace Wind.Shared.Models
     /// <summary>
     /// 匹配系统设置
     /// </summary>
+    [GenerateSerializer]
     [MessagePackObject]
     public class MatchmakingSettings
     {
@@ -239,6 +246,7 @@ namespace Wind.Shared.Models
     /// <summary>
     /// 匹配统计信息
     /// </summary>
+    [GenerateSerializer]
     [MessagePackObject]
     public class MatchmakingStatistics
     {
@@ -276,6 +284,7 @@ namespace Wind.Shared.Models
     /// <summary>
     /// 匹配结果
     /// </summary>
+    [GenerateSerializer]
     [MessagePackObject]
     public class MatchmakingResult
     {

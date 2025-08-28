@@ -23,7 +23,7 @@ public class IsolatedConnectionTest
         try
         {
             // Arrange
-            var connectionString = "localhost:6380";
+            var connectionString = "localhost:6379";
             var connection = ConnectionMultiplexer.Connect($"{connectionString},password=windgame123");
             var database = connection.GetDatabase();
 

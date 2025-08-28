@@ -348,8 +348,12 @@ try
         .WithSecurity(MessagePackSecurity.UntrustedData);
     Log.Information("MessagePack序列化器全局配置完成");
     
-    // 配置Orleans MessagePack序列化器 (正确位置)
-    builder.Services.AddSerializer(serializerBuilder => serializerBuilder.AddMessagePackSerializer());
+    // 配置Orleans MessagePack序列化器 (正确位置)  
+    builder.Services.AddSerializer(serializerBuilder => 
+    {
+        serializerBuilder.AddMessagePackSerializer();
+        // Orleans自动检测GenerateSerializer属性的类型
+    });
 
     // 配置连接池管理服务
     builder.Services.Configure<ConnectionPoolOptions>(options =>

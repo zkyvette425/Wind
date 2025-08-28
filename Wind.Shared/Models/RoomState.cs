@@ -1,4 +1,5 @@
 using MessagePack;
+using Orleans;
 using System;
 using System.Collections.Generic;
 
@@ -8,188 +9,193 @@ namespace Wind.Shared.Models
     /// 房间状态数据模型
     /// 包含房间的基础信息、玩家列表、游戏设置和状态管理
     /// </summary>
+    [GenerateSerializer]
     [MessagePackObject]
     public class RoomState
     {
-        [Key(0)]
+        [Id(0)][Key(0)]
         public int Version { get; set; } = 1;
 
-        [Key(1)]
+        [Id(1)][Key(1)]
         public string RoomId { get; set; } = string.Empty;
 
-        [Key(2)]
+        [Id(2)][Key(2)]
         public string RoomName { get; set; } = string.Empty;
 
-        [Key(3)]
+        [Id(3)][Key(3)]
         public string CreatorId { get; set; } = string.Empty;
 
-        [Key(4)]
+        [Id(4)][Key(4)]
         public RoomType RoomType { get; set; } = RoomType.Normal;
 
-        [Key(5)]
+        [Id(5)][Key(5)]
         public RoomStatus Status { get; set; } = RoomStatus.Waiting;
 
-        [Key(6)]
+        [Id(6)][Key(6)]
         public int MaxPlayerCount { get; set; } = 4;
 
-        [Key(7)]
+        [Id(7)][Key(7)]
         public int CurrentPlayerCount { get; set; } = 0;
 
-        [Key(8)]
+        [Id(8)][Key(8)]
         public List<RoomPlayer> Players { get; set; } = new();
 
-        [Key(9)]
+        [Id(9)][Key(9)]
         public RoomSettings Settings { get; set; } = new();
 
-        [Key(10)]
+        [Id(10)][Key(10)]
         public RoomGameState GameState { get; set; } = new();
 
-        [Key(11)]
+        [Id(11)][Key(11)]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        [Key(12)]
+        [Id(12)][Key(12)]
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-        [Key(13)]
+        [Id(13)][Key(13)]
         public DateTime? GameStartTime { get; set; }
 
-        [Key(14)]
+        [Id(14)][Key(14)]
         public DateTime? GameEndTime { get; set; }
 
-        [Key(15)]
+        [Id(15)][Key(15)]
         public string? Password { get; set; }
 
-        [Key(16)]
+        [Id(16)][Key(16)]
         public Dictionary<string, object> CustomData { get; set; } = new();
 
-        [Key(17)]
+        [Id(17)][Key(17)]
         public DateTime LastActivityAt { get; set; } = DateTime.UtcNow;
     }
 
     /// <summary>
     /// 房间内玩家信息
     /// </summary>
+    [GenerateSerializer]
     [MessagePackObject]
     public class RoomPlayer
     {
-        [Key(0)]
+        [Id(0)][Key(0)]
         public string PlayerId { get; set; } = string.Empty;
 
-        [Key(1)]
+        [Id(1)][Key(1)]
         public string DisplayName { get; set; } = string.Empty;
 
-        [Key(2)]
+        [Id(2)][Key(2)]
         public int Level { get; set; } = 1;
 
-        [Key(3)]
+        [Id(3)][Key(3)]
         public PlayerRole Role { get; set; } = PlayerRole.Member;
 
-        [Key(4)]
+        [Id(4)][Key(4)]
         public PlayerReadyStatus ReadyStatus { get; set; } = PlayerReadyStatus.NotReady;
 
-        [Key(5)]
+        [Id(5)][Key(5)]
         public DateTime JoinedAt { get; set; } = DateTime.UtcNow;
 
-        [Key(6)]
+        [Id(6)][Key(6)]
         public PlayerPosition Position { get; set; } = new();
 
-        [Key(7)]
+        [Id(7)][Key(7)]
         public int Score { get; set; } = 0;
 
-        [Key(8)]
+        [Id(8)][Key(8)]
         public Dictionary<string, object> PlayerData { get; set; } = new();
     }
 
     /// <summary>
     /// 房间设置信息
     /// </summary>
+    [GenerateSerializer]
     [MessagePackObject]
     public class RoomSettings
     {
-        [Key(0)]
+        [Id(0)][Key(0)]
         public string GameMode { get; set; } = "Default";
 
-        [Key(1)]
+        [Id(1)][Key(1)]
         public string MapId { get; set; } = "DefaultMap";
 
-        [Key(2)]
+        [Id(2)][Key(2)]
         public int GameDuration { get; set; } = 300; // 秒
 
-        [Key(3)]
+        [Id(3)][Key(3)]
         public int MaxScore { get; set; } = 100;
 
-        [Key(4)]
+        [Id(4)][Key(4)]
         public bool EnableSpectators { get; set; } = true;
 
-        [Key(5)]
+        [Id(5)][Key(5)]
         public bool IsPrivate { get; set; } = false;
 
-        [Key(6)]
+        [Id(6)][Key(6)]
         public bool AutoStart { get; set; } = false;
 
-        [Key(7)]
+        [Id(7)][Key(7)]
         public int MinPlayersToStart { get; set; } = 2;
 
-        [Key(8)]
+        [Id(8)][Key(8)]
         public Dictionary<string, object> GameRules { get; set; } = new();
 
-        [Key(9)]
+        [Id(9)][Key(9)]
         public Dictionary<string, object> CustomSettings { get; set; } = new();
     }
 
     /// <summary>
     /// 房间游戏状态信息
     /// </summary>
+    [GenerateSerializer]
     [MessagePackObject]
     public class RoomGameState
     {
-        [Key(0)]
+        [Id(0)][Key(0)]
         public int RoundNumber { get; set; } = 0;
 
-        [Key(1)]
+        [Id(1)][Key(1)]
         public int ElapsedTime { get; set; } = 0; // 游戏已进行时间(秒)
 
-        [Key(2)]
+        [Id(2)][Key(2)]
         public string? CurrentWinner { get; set; }
 
-        [Key(3)]
+        [Id(3)][Key(3)]
         public List<string> Spectators { get; set; } = new();
 
-        [Key(4)]
+        [Id(4)][Key(4)]
         public Dictionary<string, int> PlayerScores { get; set; } = new();
 
-        [Key(5)]
+        [Id(5)][Key(5)]
         public Dictionary<string, object> GameData { get; set; } = new();
 
-        [Key(6)]
+        [Id(6)][Key(6)]
         public DateTime LastUpdateTime { get; set; } = DateTime.UtcNow;
 
-        [Key(7)]
+        [Id(7)][Key(7)]
         public List<RoomEvent> RecentEvents { get; set; } = new();
     }
 
     /// <summary>
     /// 房间事件记录
     /// </summary>
+    [GenerateSerializer]
     [MessagePackObject]
     public class RoomEvent
     {
-        [Key(0)]
+        [Id(0)][Key(0)]
         public string EventId { get; set; } = Guid.NewGuid().ToString();
 
-        [Key(1)]
+        [Id(1)][Key(1)]
         public RoomEventType EventType { get; set; }
 
-        [Key(2)]
+        [Id(2)][Key(2)]
         public string? PlayerId { get; set; }
 
-        [Key(3)]
+        [Id(3)][Key(3)]
         public string Description { get; set; } = string.Empty;
 
-        [Key(4)]
+        [Id(4)][Key(4)]
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
 
-        [Key(5)]
+        [Id(5)][Key(5)]
         public Dictionary<string, object> EventData { get; set; } = new();
     }
 

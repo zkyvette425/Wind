@@ -432,6 +432,10 @@ try
         options.RetryDelayMilliseconds = 1000;
     });
     builder.Services.AddSingleton<LoadBalancingService>();
+    
+    // 注册消息路由服务 - v1.3网络通信层
+    builder.Services.AddSingleton<Wind.Shared.Services.IMessageRouter, MessageRouterService>();
+    Log.Information("消息路由服务已注册 - 智能路由和广播系统就绪");
     Log.Information("负载均衡服务注册完成");
 
     // 添加健康检查

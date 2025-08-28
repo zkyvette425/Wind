@@ -1,0 +1,96 @@
+# MagicOnion 重要文档链接集合
+# 用于Wind项目MagicOnion API修复工作
+# 创建时间: 2025-08-28
+
+## 官方文档链接
+
+### 核心概念
+- MagicOnion 官方首页: https://cysharp.github.io/MagicOnion/
+- GitHub 仓库: https://github.com/Cysharp/MagicOnion
+- README 文件: https://raw.githubusercontent.com/Cysharp/MagicOnion/master/README.md
+
+### StreamingHub 相关（重点）
+- StreamingHub 概述: https://cysharp.github.io/MagicOnion/streaminghub/streaminghub
+- StreamingHub 服务器端: https://cysharp.github.io/MagicOnion/streaminghub/server
+- StreamingHub 客户端: https://cysharp.github.io/MagicOnion/streaminghub/client
+- Group 管理: https://cysharp.github.io/MagicOnion/streaminghub/group
+- 广播机制: https://cysharp.github.io/MagicOnion/streaminghub/broadcasting
+
+### API 参考
+- UnaryService: https://cysharp.github.io/MagicOnion/unary/unary
+- 过滤器: https://cysharp.github.io/MagicOnion/filter/filter
+- 认证授权: https://cysharp.github.io/MagicOnion/authentication/authentication
+
+### 示例和最佳实践
+- 示例代码: https://github.com/Cysharp/MagicOnion/tree/master/samples
+- ChatApp 示例: https://github.com/Cysharp/MagicOnion/tree/master/samples/ChatApp
+- 性能优化: https://cysharp.github.io/MagicOnion/performance/performance
+
+## 获取命令示例
+
+### 获取核心StreamingHub文档
+```batch
+cd C:\work\Wind\tools\web-content-fetcher
+
+REM 获取StreamingHub概述
+fetch-web-content.bat "https://cysharp.github.io/MagicOnion/streaminghub/streaminghub" --clean -o "streaminghub-overview.txt"
+
+REM 获取服务器端实现
+fetch-web-content.bat "https://cysharp.github.io/MagicOnion/streaminghub/server" --clean -o "streaminghub-server.txt"
+
+REM 获取Group管理
+fetch-web-content.bat "https://cysharp.github.io/MagicOnion/streaminghub/group" --clean -o "streaminghub-group.txt"
+
+REM 获取广播机制
+fetch-web-content.bat "https://cysharp.github.io/MagicOnion/streaminghub/broadcasting" --clean -o "streaminghub-broadcasting.txt"
+```
+
+### 获取示例代码
+```batch
+REM 获取README文件
+fetch-web-content.bat "https://raw.githubusercontent.com/Cysharp/MagicOnion/master/README.md" -o "magiconion-readme.txt"
+
+REM 获取ChatApp示例
+fetch-web-content.bat "https://raw.githubusercontent.com/Cysharp/MagicOnion/master/samples/ChatApp/ChatApp.Server/ChatHub.cs" -o "chatapp-hub-example.txt"
+```
+
+### PowerShell 版本命令
+```powershell
+cd C:\work\Wind\tools\web-content-fetcher
+
+# 获取核心文档
+.\fetch-web-content.ps1 "https://cysharp.github.io/MagicOnion/streaminghub/streaminghub" -OutputFile "streaminghub-overview.txt" -CleanHtml
+
+# 获取API参考
+.\fetch-web-content.ps1 "https://cysharp.github.io/MagicOnion/api/MagicOnion.Server.Hubs.StreamingHubBase-2.html" -OutputFile "api-reference.txt" -CleanHtml
+```
+
+## 优先获取列表（解决当前问题）
+
+1. **StreamingHub Group管理** (最高优先级)
+   - URL: https://cysharp.github.io/MagicOnion/streaminghub/group
+   - 目的: 了解Group.AddAsync, Group.Remove等正确用法
+
+2. **StreamingHub 广播机制** (高优先级)
+   - URL: https://cysharp.github.io/MagicOnion/streaminghub/broadcasting
+   - 目的: 了解BroadcastToGroup, BroadcastExceptSelf等正确实现
+
+3. **StreamingHub 服务器端** (高优先级)
+   - URL: https://cysharp.github.io/MagicOnion/streaminghub/server
+   - 目的: 了解完整的服务器端实现模式
+
+4. **ChatApp 示例代码** (中等优先级)
+   - URL: https://github.com/Cysharp/MagicOnion/tree/master/samples/ChatApp
+   - 目的: 参考实际工作的聊天室实现
+
+5. **错误处理和最佳实践** (中等优先级)
+   - URL: https://cysharp.github.io/MagicOnion/fundamentals/fundamentals
+   - 目的: 了解正确的错误处理模式
+
+## 后续使用建议
+
+1. **逐步获取**: 优先获取解决当前问题的核心文档
+2. **交叉验证**: 对比官方文档和示例代码
+3. **及时应用**: 获取文档后立即应用到代码修复中
+4. **建立知识库**: 将重要信息整理到项目文档中
+5. **定期更新**: 定期更新文档内容，跟上版本变化

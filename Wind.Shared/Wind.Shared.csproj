@@ -10,6 +10,8 @@
   <ItemGroup>
     <!-- Orleans序列化抽象 -->
     <PackageReference Include="Microsoft.Orleans.Serialization.Abstractions" Version="9.2.1" />
+    <!-- 日志抽象 -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
   </ItemGroup>
 
 </Project>

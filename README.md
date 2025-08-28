@@ -5,7 +5,7 @@
 ![.NET](https://img.shields.io/badge/.NET-9.0-purple)
 ![Version](https://img.shields.io/badge/Version-v1.3-success)
 ![Performance](https://img.shields.io/badge/Performance-2.9M%20ops%2Fsec-red)
-![Tested](https://img.shields.io/badge/Tests-28%2F28%20✅-brightgreen)
+![Tested](https://img.shields.io/badge/Tests-58%2F58%20✅-brightgreen)
 ![Network](https://img.shields.io/badge/Load%20Balancing-5%20Strategies-blue)
 
 基于 Microsoft Orleans + MagicOnion 的现代化分布式游戏服务器框架。
@@ -103,6 +103,12 @@ dotnet test --filter "FullyQualifiedName~PlayerRoomMatchmakingIntegrationTests"
 # 运行网络基础设施测试 (v1.3新增)
 dotnet test --filter "ConnectionPoolManagerTests"
 dotnet test --filter "LoadBalancingServiceTests"
+
+# 运行消息路由系统测试 (v1.3模块4.3.1新增)
+dotnet test --filter "MessageRouterServiceTests"
+dotnet test --filter "MessageCompressionTests"
+dotnet test --filter "MessageRouterIntegrationTests"
+dotnet test --filter "MagicOnionCompatibilityTests"
 ```
 
 ### 📊 性能测试结果 (已验证)
@@ -140,18 +146,26 @@ dotnet test --filter "LoadBalancingServiceTests"
 - ✅ **MongoDB持久化服务** - 连接池+健康检查+索引管理
 - ✅ **数据同步机制** - Write-Through/Write-Behind/Cache-Aside策略
 
-#### 🌐 网络基础设施 (v1.3新增)
+#### 🌐 网络通信层 (v1.3完成)
 - ✅ **MagicOnion服务接口** - IGameService/IChatHub/IRoomHub完整API设计
 - ✅ **连接池管理器** - 支持10,000+并发连接，完整生命周期管理
 - ✅ **负载均衡服务** - 5种策略（轮询/加权轮询/最少连接/随机/一致性哈希）
 - ✅ **健康检查机制** - 自动故障转移和节点管理
 - ✅ **统计和监控** - 详细的连接和负载统计信息
 
+#### 📡 消息路由和协议优化 (v1.3模块4.3.1完成)
+- ✅ **智能消息路由** - 6种路由类型（单播/多播/广播/房间广播/区域广播/角色广播）
+- ✅ **消息协议优化** - 统一MessagePack协议，支持版本兼容和扩展
+- ✅ **智能压缩系统** - Gzip/LZ4/Brotli三种算法，自动选择最优方案
+- ✅ **批量处理优化** - 消息分组和优先级排序，提升网络效率
+- ✅ **MagicOnion兼容性** - 完全兼容MessagePack序列化，支持gRPC通信
+
 #### 🧪 性能验证
 - ✅ **高并发测试** - 5000用户并发，100%成功率
 - ✅ **压力测试** - 1000玩家游戏负载模拟，26000+ ops/sec
 - ✅ **基准测试** - 完整性能基准建立，远超10000+并发目标
 - ✅ **网络层测试** - 28个测试用例100%通过，连接池+负载均衡算法验证
+- ✅ **消息路由测试** - 30个测试用例100%通过，路由+压缩+集成+兼容性全覆盖
 
 ### 🚧 开发中功能 (v1.4+)
 

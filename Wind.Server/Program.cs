@@ -15,6 +15,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Security.Claims;
+using System.IO.Compression;
+using Grpc.AspNetCore.Server;
+using Grpc.Net.Compression;
 using Wind.Shared.Auth;
 using Wind.Server.Services;
 using Wind.Server.Middleware;
@@ -39,12 +42,31 @@ try
     // 使用WebApplication支持MagicOnion的gRPC服务
     var builder = WebApplication.CreateBuilder(args);
 
-    // 配置Kestrel支持HTTP/2 (MagicOnion需要)
+    // 配置Kestrel支持gRPC和HTTP (MagicOnion + REST API)
     builder.WebHost.ConfigureKestrel(options =>
     {
+        // 配置HTTP/2性能优化 (基于MagicOnion最佳实践)
+        var http2 = options.Limits.Http2;
+        http2.InitialConnectionWindowSize = 1024 * 1024 * 2; // 2 MB 连接窗口
+        http2.InitialStreamWindowSize = 1024 * 1024; // 1 MB 流窗口
+        http2.MaxStreamsPerConnection = 1000; // 每连接最大并发流
+        
+        // gRPC端口 - 仅HTTP/2 (生产环境推荐使用HTTPS)
         options.ListenLocalhost(5271, listenOptions =>
         {
             listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http2;
+        });
+        
+        // HTTP/1.1端口 - 用于健康检查、管理API等
+        options.ListenLocalhost(5270, listenOptions =>
+        {
+            listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1;
+        });
+        
+        // 混合协议端口 - 开发和调试使用
+        options.ListenLocalhost(5272, listenOptions =>
+        {
+            listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1AndHttp2;
         });
     });
 
@@ -333,6 +355,18 @@ try
     // 注册JWT认证Filter (暂时禁用，待MagicOnion API兼容性修复)
     // builder.Services.AddSingleton<Wind.Server.Filters.JwtAuthorizationFilter>();
     
+    // 添加gRPC核心服务 (MagicOnion的基础)
+    builder.Services.AddGrpc(options =>
+    {
+        // gRPC全局配置
+        options.MaxReceiveMessageSize = 1024 * 1024 * 4; // 4MB 最大接收消息
+        options.MaxSendMessageSize = 1024 * 1024 * 4; // 4MB 最大发送消息
+        options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+        options.CompressionProviders.Add(new GzipCompressionProvider(System.IO.Compression.CompressionLevel.Optimal));
+        options.ResponseCompressionLevel = System.IO.Compression.CompressionLevel.Optimal;
+        options.ResponseCompressionAlgorithm = "gzip";
+    });
+    
     // 添加MagicOnion服务 (基于Context7文档)
     builder.Services.AddMagicOnion(options =>
     {
@@ -342,17 +376,34 @@ try
         Log.Information("MagicOnion服务配置完成");
     });
     
-    // 配置全局MessagePack序列化选项
-    MessagePackSerializer.DefaultOptions = MessagePackSerializerOptions.Standard
-        .WithResolver(MessagePack.Resolvers.ContractlessStandardResolver.Instance)
-        .WithSecurity(MessagePackSecurity.UntrustedData);
-    Log.Information("MessagePack序列化器全局配置完成");
+    // 配置MessagePack全局序列化选项 (MagicOnion + Orleans 2025最佳实践)
+    var resolver = MessagePack.Resolvers.CompositeResolver.Create(
+        // MagicOnion生成的Resolver (优先级最高，客户端启用)
+        // MagicOnionGeneratedClientInitializer.Resolver, // 客户端时启用
+        
+        // Orleans和属性相关Resolver
+        MessagePack.Resolvers.AttributeFormatterResolver.Instance,
+        MessagePack.Resolvers.BuiltinResolver.Instance,
+        
+        // 高性能Resolver (服务端推荐配置)
+        MessagePack.Resolvers.PrimitiveObjectResolver.Instance,
+        
+        // 标准Resolver (最后fallback)
+        MessagePack.Resolvers.StandardResolver.Instance
+    );
     
-    // 配置Orleans MessagePack序列化器 (正确位置)  
+    MessagePackSerializer.DefaultOptions = MessagePackSerializerOptions.Standard
+        .WithResolver(resolver)
+        .WithSecurity(MessagePackSecurity.UntrustedData) // CVE-2020-5234 安全补丁
+        .WithCompression(MessagePackCompression.Lz4BlockArray); // 启用压缩
+    
+    Log.Information("MessagePack序列化器全局配置完成: 支持MagicOnion + Orleans，启用安全模式和压缩");
+    
+    // 配置Orleans MessagePack序列化器 (基于Microsoft.Orleans.Serialization.MessagePack 9.2.1)
     builder.Services.AddSerializer(serializerBuilder => 
     {
         serializerBuilder.AddMessagePackSerializer();
-        // Orleans自动检测GenerateSerializer属性的类型
+        Log.Information("Orleans MessagePack序列化器已注册");
     });
 
     // 配置连接池管理服务

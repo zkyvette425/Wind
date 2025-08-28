@@ -25,11 +25,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Orleans序列化和持久化 -->
     <PackageReference Include="Microsoft.Orleans.Serialization.MessagePack" Version="9.2.1" />
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.8" />
-    <PackageReference Include="MongoDB.Driver" Version="3.4.2" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
     <PackageReference Include="Microsoft.Orleans.Persistence.Redis" Version="9.2.1" />
+    
+    <!-- 认证和安全 -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.8" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.2.1" />
+    
+    <!-- 数据存储 -->
+    <PackageReference Include="MongoDB.Driver" Version="3.4.2" />
   </ItemGroup>
 
 </Project>

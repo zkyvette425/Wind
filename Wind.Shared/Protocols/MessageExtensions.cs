@@ -363,6 +363,7 @@ public static class MessageExtensions
         if (data.Length < CompressionThreshold)
         {
             stats.Algorithm = "None";
+            stats.CompressedSize = data.Length;
             stats.EndTime = DateTimeOffset.UtcNow;
             return (data, CompressionType.None, stats); // 小数据不压缩
         }

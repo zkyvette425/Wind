@@ -683,5 +683,53 @@ namespace Wind.Server.Services
         }
 
         #endregion
+
+        #region 健康检查API实现
+
+        /// <summary>
+        /// 健康检查API - 用于连接预热和服务健康监控
+        /// </summary>
+        public async UnaryResult<HealthCheckResponse> HealthCheckAsync()
+        {
+            try
+            {
+                _logger.LogDebug("收到健康检查请求");
+
+                // 获取系统性能指标
+                double? serverLoad = null;
+                try
+                {
+                    // 简单的CPU使用率监控
+                    var process = System.Diagnostics.Process.GetCurrentProcess();
+                    serverLoad = process.TotalProcessorTime.TotalMilliseconds / Environment.ProcessorCount / 1000.0;
+                }
+                catch (Exception loadEx)
+                {
+                    _logger.LogDebug(loadEx, "获取服务器负载信息失败");
+                }
+
+                return new HealthCheckResponse
+                {
+                    IsHealthy = true,
+                    Status = "Healthy",
+                    Timestamp = DateTime.UtcNow,
+                    Version = "1.3.0",
+                    ServerLoad = serverLoad
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "健康检查失败");
+                return new HealthCheckResponse
+                {
+                    IsHealthy = false,
+                    Status = "Unhealthy",
+                    Timestamp = DateTime.UtcNow,
+                    Version = "1.3.0"
+                };
+            }
+        }
+
+        #endregion
     }
 }

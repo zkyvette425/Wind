@@ -739,4 +739,42 @@ namespace Wind.Shared.Protocols
         [MessagePack.Key(3)]
         public DateTime UnsubscribedAt { get; set; } = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// 健康检查响应
+    /// 用于服务健康状态监控和连接预热
+    /// </summary>
+    [MessagePackObject]
+    public class HealthCheckResponse
+    {
+        /// <summary>
+        /// 是否健康
+        /// </summary>
+        [MessagePack.Key(0)]
+        public bool IsHealthy { get; set; } = true;
+
+        /// <summary>
+        /// 服务状态描述
+        /// </summary>
+        [MessagePack.Key(1)]
+        public string Status { get; set; } = "Healthy";
+
+        /// <summary>
+        /// 响应时间戳
+        /// </summary>
+        [MessagePack.Key(2)]
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// 服务版本
+        /// </summary>
+        [MessagePack.Key(3)]
+        public string Version { get; set; } = "1.3.0";
+
+        /// <summary>
+        /// 服务器负载信息（可选）
+        /// </summary>
+        [MessagePack.Key(4)]
+        public double? ServerLoad { get; set; }
+    }
 }

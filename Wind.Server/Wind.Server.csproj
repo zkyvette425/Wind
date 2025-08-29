@@ -35,6 +35,10 @@
     
     <!-- 数据存储 -->
     <PackageReference Include="MongoDB.Driver" Version="3.4.2" />
+    
+    <!-- gRPC客户端 (用于连接预热) -->
+    <PackageReference Include="Grpc.Net.Client" Version="2.67.0" />
+    <PackageReference Include="MagicOnion.Client" Version="7.0.6" />
   </ItemGroup>
 
 </Project>

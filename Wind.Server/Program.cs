@@ -436,7 +436,22 @@ try
     // 注册消息路由服务 - v1.3网络通信层
     builder.Services.AddSingleton<Wind.Shared.Services.IMessageRouter, MessageRouterService>();
     Log.Information("消息路由服务已注册 - 智能路由和广播系统就绪");
+    
+    // 配置连接预热服务
+    builder.Services.Configure<ConnectionWarmupOptions>(options =>
+    {
+        options.WarmupConnectionCount = 10;
+        options.WarmupTimeoutMs = 5000;
+        options.MaxRetryCount = 3;
+        options.RetryDelayMs = 1000;
+        options.ServerAddress = "http://localhost:5271";
+        options.EnableWarmup = true;
+        options.StartDelayMs = 2000;
+    });
+    builder.Services.AddHostedService<ConnectionWarmupService>();
+    
     Log.Information("负载均衡服务注册完成");
+    Log.Information("连接预热服务已注册 - 启动时自动预热{Count}个gRPC连接", 10);
 
     // 添加健康检查
     builder.Services.AddHealthChecks()
@@ -498,7 +513,40 @@ try
             Ready = "/health/ready", 
             Live = "/health/live",
             Redis = "/health/redis",
+            ConnectionWarmup = "/warmup/status",
             MagicOnion = "gRPC on port 5271"
+        }
+    });
+    
+    // 添加连接预热状态监控端点
+    app.MapGet("/warmup/status", (IServiceProvider serviceProvider) =>
+    {
+        try
+        {
+            var warmupService = serviceProvider.GetService<ConnectionWarmupService>();
+            if (warmupService == null)
+            {
+                return Results.Ok(new
+                {
+                    Status = "Service Not Available",
+                    Message = "连接预热服务未注册"
+                });
+            }
+
+            var stats = warmupService.GetStats();
+            return Results.Ok(new
+            {
+                Status = "OK",
+                Timestamp = DateTime.UtcNow,
+                WarmupEnabled = stats.IsWarmupEnabled,
+                TotalConnections = stats.TotalWarmupConnections,
+                TargetConnections = stats.TargetWarmupConnections,
+                SuccessRate = $"{stats.WarmupSuccessRate:F1}%"
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem($"获取预热状态失败: {ex.Message}");
         }
     });
 

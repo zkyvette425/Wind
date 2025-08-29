@@ -120,5 +120,15 @@ namespace Wind.Shared.Services
         UnaryResult<KickPlayerResponse> KickPlayerAsync(KickPlayerRequest request);
 
         #endregion
+
+        #region 健康检查API
+
+        /// <summary>
+        /// 健康检查API - 用于连接预热和服务健康监控
+        /// </summary>
+        /// <returns>健康状态响应</returns>
+        UnaryResult<HealthCheckResponse> HealthCheckAsync();
+
+        #endregion
     }
 }

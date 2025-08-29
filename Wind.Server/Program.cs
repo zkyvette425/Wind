@@ -450,8 +450,21 @@ try
     });
     builder.Services.AddHostedService<ConnectionWarmupService>();
     
+    // 配置请求批处理服务
+    builder.Services.Configure<RequestBatchingOptions>(options =>
+    {
+        options.MaxBatchSize = 50;
+        options.MaxWaitTimeMs = 10;
+        options.EnableBatching = true;
+        options.MaxQueueSize = 1000;
+        options.WorkerThreadCount = Environment.ProcessorCount;
+        options.StatsUpdateIntervalMs = 5000;
+    });
+    builder.Services.AddHostedService<RequestBatchingService>();
+    
     Log.Information("负载均衡服务注册完成");
     Log.Information("连接预热服务已注册 - 启动时自动预热{Count}个gRPC连接", 10);
+    Log.Information("请求批处理服务已注册 - 批大小: {BatchSize}, 等待时间: {WaitTime}ms", 50, 10);
 
     // 添加健康检查
     builder.Services.AddHealthChecks()
@@ -514,6 +527,7 @@ try
             Live = "/health/live",
             Redis = "/health/redis",
             ConnectionWarmup = "/warmup/status",
+            RequestBatching = "/batching/status",
             MagicOnion = "gRPC on port 5271"
         }
     });
@@ -547,6 +561,41 @@ try
         catch (Exception ex)
         {
             return Results.Problem($"获取预热状态失败: {ex.Message}");
+        }
+    });
+
+    // 添加请求批处理状态监控端点
+    app.MapGet("/batching/status", (IServiceProvider serviceProvider) =>
+    {
+        try
+        {
+            var batchingService = serviceProvider.GetService<RequestBatchingService>();
+            if (batchingService == null)
+            {
+                return Results.Ok(new
+                {
+                    Status = "Service Not Available",
+                    Message = "请求批处理服务未注册"
+                });
+            }
+
+            var stats = batchingService.GetStatistics();
+            return Results.Ok(new
+            {
+                Status = "OK",
+                Timestamp = DateTime.UtcNow,
+                TotalRequestsProcessed = stats.TotalRequestsProcessed,
+                TotalBatchesProcessed = stats.TotalBatchesProcessed,
+                CurrentQueueSize = stats.CurrentQueueSize,
+                AverageBatchSize = Math.Round(stats.AverageBatchSize, 2),
+                AverageWaitTime = Math.Round(stats.AverageWaitTime, 2),
+                ThroughputImprovement = $"{stats.ThroughputImprovement:F1}%",
+                LastStatsUpdate = stats.LastStatsUpdate
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem($"获取批处理状态失败: {ex.Message}");
         }
     });
 

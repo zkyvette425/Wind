@@ -462,9 +462,25 @@ try
     });
     builder.Services.AddHostedService<RequestBatchingService>();
     
+    // 配置自适应超时服务
+    builder.Services.Configure<AdaptiveTimeoutOptions>(options =>
+    {
+        options.BaseTimeoutMs = 5000;
+        options.MinTimeoutMs = 1000;
+        options.MaxTimeoutMs = 30000;
+        options.HistorySize = 100;
+        options.AdjustmentFactor = 1.5;
+        options.EvaluationIntervalMs = 10000;
+        options.EnableAdaptiveTimeout = true;
+        options.NetworkQualityWindowSize = 50;
+        options.TimeoutSensitivity = 0.8;
+    });
+    builder.Services.AddHostedService<AdaptiveTimeoutService>();
+    
     Log.Information("负载均衡服务注册完成");
     Log.Information("连接预热服务已注册 - 启动时自动预热{Count}个gRPC连接", 10);
     Log.Information("请求批处理服务已注册 - 批大小: {BatchSize}, 等待时间: {WaitTime}ms", 50, 10);
+    Log.Information("自适应超时服务已注册 - 基础超时: {BaseTimeout}ms, 评估间隔: {EvalInterval}ms", 5000, 10000);
 
     // 添加健康检查
     builder.Services.AddHealthChecks()
@@ -528,6 +544,7 @@ try
             Redis = "/health/redis",
             ConnectionWarmup = "/warmup/status",
             RequestBatching = "/batching/status",
+            AdaptiveTimeout = "/timeout/status",
             MagicOnion = "gRPC on port 5271"
         }
     });
@@ -596,6 +613,50 @@ try
         catch (Exception ex)
         {
             return Results.Problem($"获取批处理状态失败: {ex.Message}");
+        }
+    });
+
+    // 添加自适应超时状态监控端点
+    app.MapGet("/timeout/status", (IServiceProvider serviceProvider) =>
+    {
+        try
+        {
+            var timeoutService = serviceProvider.GetService<AdaptiveTimeoutService>();
+            if (timeoutService == null)
+            {
+                return Results.Ok(new
+                {
+                    Status = "Service Not Available",
+                    Message = "自适应超时服务未注册"
+                });
+            }
+
+            var stats = timeoutService.GetStatistics();
+            return Results.Ok(new
+            {
+                Status = "OK",
+                Timestamp = DateTime.UtcNow,
+                TotalOperations = stats.TotalOperations,
+                TimeoutOptimizations = stats.TimeoutOptimizations,
+                PerformanceImprovement = $"{stats.PerformanceImprovement:F1}%",
+                NetworkQuality = new
+                {
+                    AverageResponseTime = Math.Round(stats.CurrentNetworkQuality.AverageResponseTime, 2),
+                    ResponseTimeStdDev = Math.Round(stats.CurrentNetworkQuality.ResponseTimeStdDev, 2),
+                    TimeoutRate = $"{stats.CurrentNetworkQuality.TimeoutRate * 100:F2}%",
+                    ErrorRate = $"{stats.CurrentNetworkQuality.ErrorRate * 100:F2}%",
+                    QualityScore = Math.Round(stats.CurrentNetworkQuality.QualityScore, 1),
+                    LastUpdate = stats.CurrentNetworkQuality.LastUpdate
+                },
+                RecommendedTimeouts = stats.RecommendedTimeouts.ToDictionary(
+                    kvp => kvp.Key.ToString(), 
+                    kvp => $"{kvp.Value}ms"),
+                LastStatsUpdate = stats.LastStatsUpdate
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem($"获取自适应超时状态失败: {ex.Message}");
         }
     });
 
